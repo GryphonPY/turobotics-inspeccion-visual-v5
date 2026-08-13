@@ -1,0 +1,16 @@
+.venv/
+backup/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+data/raw_sessions/*
+data/processed/*
+data/golden_test/*
+data/inspection_v4.jsonl
+data/inspection_v4.csv
+!data/raw_sessions/.gitkeep
+!data/processed/.gitkeep
+!data/references/.gitkeep
+!data/models/.gitkeep
+!data/golden_test/.gitkeep
