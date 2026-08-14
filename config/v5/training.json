@@ -1,0 +1,15 @@
+{
+  "version": "training_v1",
+  "session_id": "session_20260813_001845",
+  "reference_path": "data/v5/references/reference_v1.npz",
+  "train_rounds": [1, 2, 3, 4, 5],
+  "validation_rounds": [6],
+  "holdout_rounds": [7],
+  "seed": 20260813,
+  "pretrained": true,
+  "freeze_epochs": 2,
+  "epochs": 4,
+  "batch_size": 16,
+  "learning_rate": 0.0005,
+  "weight_decay": 0.0001
+}

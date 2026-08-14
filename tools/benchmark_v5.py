@@ -10,6 +10,7 @@ import numpy as np
 
 from inspection_v5.board_tracker import BoardTracker, V5BoardConfig
 from inspection_v5.contracts import FramePacket
+from inspection_v5.model_runtime import PresenceModel
 
 
 def synthetic_board(config: V5BoardConfig) -> np.ndarray:
@@ -44,13 +45,31 @@ def benchmark_board(root: Path, frames: int) -> tuple[float, float]:
     return statistics.median(samples), float(np.percentile(samples, 95))
 
 
+def benchmark_onnx(root: Path, frames: int) -> tuple[float, float]:
+    model = PresenceModel(
+        root / "data" / "v5" / "models" / "presence_v1.onnx",
+        root / "data" / "v5" / "models" / "presence_v1.manifest.json",
+    )
+    tensor = np.zeros((3, 224, 224), dtype=np.float32)
+    for _ in range(10):
+        model.predict(tensor)
+    samples: list[float] = []
+    for _ in range(frames):
+        samples.append(model.predict(tensor).latency_ms)
+    return statistics.median(samples), float(np.percentile(samples, 95))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark V5 stages")
-    parser.add_argument("--stage", choices=("board",), required=True)
+    parser.add_argument("--stage", choices=("board", "onnx"), required=True)
     parser.add_argument("--frames", type=int, default=200)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
-    median, p95 = benchmark_board(args.root, args.frames)
+    median, p95 = (
+        benchmark_board(args.root, args.frames)
+        if args.stage == "board"
+        else benchmark_onnx(args.root, args.frames)
+    )
     print(f"stage={args.stage} frames={args.frames} median_ms={median:.2f} p95_ms={p95:.2f}")
     return 0 if p95 <= 35.0 else 1
 

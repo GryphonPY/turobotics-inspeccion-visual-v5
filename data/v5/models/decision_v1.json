@@ -1,0 +1,64 @@
+{
+  "version": "decision_v1",
+  "session_id": "session_20260813_001845",
+  "calibration_rounds": [
+    6
+  ],
+  "holdout_rounds": [
+    7
+  ],
+  "sample_count": 314,
+  "thresholds": {
+    "C01": 0.03929358,
+    "C02": 0.85511911,
+    "C03": 0.35131988,
+    "C04": 0.83214772,
+    "C05": 0.09942181,
+    "C06": 0.77073961,
+    "C07": 0.38183555,
+    "C08": 0.99903959,
+    "C09": 0.01014499,
+    "C10": 0.00417727,
+    "GLOBAL": 0.18408725
+  },
+  "false_passes": {
+    "C01": 0,
+    "C02": 0,
+    "C03": 0,
+    "C04": 0,
+    "C05": 0,
+    "C06": 0,
+    "C07": 0,
+    "C08": 0,
+    "C09": 0,
+    "C10": 0,
+    "GLOBAL": 0
+  },
+  "false_rejects": {
+    "C01": 0,
+    "C02": 0,
+    "C03": 0,
+    "C04": 0,
+    "C05": 0,
+    "C06": 0,
+    "C07": 0,
+    "C08": 30,
+    "C09": 0,
+    "C10": 0,
+    "GLOBAL": 0
+  },
+  "resolved": {
+    "C01": true,
+    "C02": true,
+    "C03": true,
+    "C04": true,
+    "C05": true,
+    "C06": true,
+    "C07": true,
+    "C08": true,
+    "C09": true,
+    "C10": true,
+    "GLOBAL": true
+  },
+  "policy": "zero calibration false passes; unresolved components require geometry or challenge evidence"
+}

@@ -1,0 +1,37 @@
+{
+  "version": "presence_v1",
+  "session_id": "session_20260813_001845",
+  "train_rounds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "validation_rounds": [
+    6
+  ],
+  "holdout_rounds": [
+    7
+  ],
+  "train_samples": 1556,
+  "validation_samples": 314,
+  "epochs": 4,
+  "freeze_epochs": 2,
+  "seed": 20260813,
+  "pretrained": true,
+  "validation_accuracy": [
+    0.7918355464935303,
+    0.808917224407196,
+    0.9609149098396301,
+    0.9840764403343201
+  ],
+  "validation_false_passes": [
+    200,
+    239,
+    84,
+    43
+  ],
+  "elapsed_seconds": 283.91,
+  "model_path": "data/v5/models/presence_v1.pt"
+}

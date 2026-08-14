@@ -1,0 +1,37 @@
+{
+  "version": "presence_v1",
+  "model_sha256": "da7ed1d8597ced7ac6a4acebb28e2fbcb0b5a67d3fef2399302e3f9dde3d84f3",
+  "checkpoint_sha256": "64b01099cec648eb5faa796705abc7c9e1bf3e4a322f981713f50459dddcc86b",
+  "input": {
+    "name": "input",
+    "shape": [
+      null,
+      3,
+      224,
+      224
+    ],
+    "dtype": "float32"
+  },
+  "output": {
+    "name": "logits",
+    "shape": [
+      null,
+      11
+    ],
+    "labels": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C08",
+      "C09",
+      "C10",
+      "GLOBAL"
+    ]
+  },
+  "data_version": "reference_v1",
+  "onnx_opset": 17
+}
