@@ -49,6 +49,8 @@ class TrackingSnapshot:
     piece_focus: float
     marker_focus: float = 0.0
     homography_age_ms: float = 0.0
+    found_ids: tuple[int, ...] = ()
+    reprojection_error_px: float = float("inf")
     reason: str = ""
 
 
