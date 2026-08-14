@@ -95,6 +95,40 @@ class BoardTracker:
         return found
 
     @staticmethod
+    def _refine_corners(frame: np.ndarray, found: dict[int, np.ndarray]) -> dict[int, np.ndarray]:
+        """Reduce camera-stream corner quantization before fitting the homography.
+
+        Marker detection may run on a reduced image for speed, but the returned
+        corners are mapped back to the original frame.  Refining those points on
+        the original grayscale frame keeps the metric fit accurate enough for
+        real phone-webcam perspective without scanning the full image twice.
+        """
+        if not found:
+            return found
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
+        criteria = (
+            cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_COUNT,
+            30,
+            0.01,
+        )
+        refined: dict[int, np.ndarray] = {}
+        for marker_id, corners in found.items():
+            original = corners.reshape(-1, 1, 2).astype(np.float32)
+            candidate = original.copy()
+            try:
+                cv2.cornerSubPix(gray, candidate, (5, 5), (-1, -1), criteria)
+            except cv2.error:
+                candidate = original
+            candidate_points = candidate.reshape(4, 2)
+            original_points = original.reshape(4, 2)
+            displacement = np.linalg.norm(candidate_points - original_points, axis=1)
+            if np.all(np.isfinite(candidate_points)) and float(np.max(displacement)) <= 8.0:
+                refined[marker_id] = candidate_points
+            else:
+                refined[marker_id] = original_points
+        return refined
+
+    @staticmethod
     def _reprojection_error(
         source: np.ndarray, destination: np.ndarray, homography: np.ndarray
     ) -> float:
@@ -147,7 +181,7 @@ class BoardTracker:
         if frame is None or frame.size == 0:
             return TrackingSnapshot(packet.sequence, packet.captured_at, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0, reason="frame_empty")
 
-        found = self._detect(frame)
+        found = self._refine_corners(frame, self._detect(frame))
         found_ids = tuple(sorted(found))
         homography: np.ndarray | None = None
         error = float("inf")

@@ -45,6 +45,26 @@ def test_tracker_detects_all_markers_and_returns_metric_roi() -> None:
     assert observation.reprojection_error_px < 1.1
 
 
+def test_tracker_refines_fast_detection_corners_before_reprojection_check(monkeypatch) -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    source = synthetic_board()
+    tracker = BoardTracker(config)
+    detected = tracker._detect(source)
+    offsets = {0: (4, 0), 1: (0, 4), 2: (-4, 0), 3: (0, -4)}
+    jittered = {
+        marker_id: corners + np.float32(offsets[marker_id])
+        for marker_id, corners in detected.items()
+    }
+    _, raw_error = tracker._fresh_homography(jittered)
+    monkeypatch.setattr(tracker, "_detect", lambda _frame: jittered)
+
+    observation = tracker.observe(packet(source), now=1.0)
+
+    assert raw_error > config.max_reprojection_error_px
+    assert observation.board_ok
+    assert observation.reprojection_error_px <= config.max_reprojection_error_px
+
+
 def test_tracker_returns_full_canonical_board_and_roi() -> None:
     config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
     observation = BoardTracker(config).observe(packet(synthetic_board()), now=1.0)
