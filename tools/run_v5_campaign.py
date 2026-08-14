@@ -226,6 +226,82 @@ def _campaign_metrics(rows: list[dict[str, object]], requested_count: int, max_f
     }
 
 
+def _release_result(root: Path, schedule: list[dict[str, str | None]], rows: list[dict[str, object]]) -> dict[str, object]:
+    complete_rows = [row for row in rows if row["scenario"] == "complete"]
+    metrics = _campaign_metrics(rows, len(schedule), max_false_rejects=1)
+    return {
+        "schema_version": 1,
+        "kind": "physical_release_full",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "git_revision": _git_revision(root),
+        "requested_count": len(schedule),
+        "completed_count": len(rows),
+        "expected_complete_count": 100,
+        "complete_pass_count": sum(row["actual_verdict"] == Verdict.PASS.value for row in complete_rows),
+        **metrics,
+        "correct_count": sum(bool(row["correct"]) for row in rows),
+        "rows": rows,
+    }
+
+
+def _write_release_result(result: dict[str, object], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    output_path.with_suffix(output_path.suffix + ".sha256").write_text(
+        f"{sha256_file(output_path)}  {output_path.name}\n", encoding="utf-8"
+    )
+
+
+def _load_release_resume_rows(
+    path: Path, schedule: list[dict[str, str | None]], git_revision: str
+) -> list[dict[str, object]]:
+    checksum_path = path.with_suffix(path.suffix + ".sha256")
+    if not path.exists() or not checksum_path.exists():
+        return []
+    try:
+        expected_hash = checksum_path.read_text(encoding="utf-8").split()[0]
+        if expected_hash != sha256_file(path):
+            return []
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, IndexError, json.JSONDecodeError):
+        return []
+    if (
+        not isinstance(raw, dict)
+        or raw.get("kind") != "physical_release_full"
+        or raw.get("git_revision") != git_revision
+        or raw.get("requested_count") != len(schedule)
+    ):
+        return []
+    rows = raw.get("rows")
+    if not isinstance(rows, list) or not rows or len(rows) >= len(schedule):
+        return []
+    for expected, row in zip(schedule, rows, strict=False):
+        if not isinstance(row, dict):
+            return []
+        if any(row.get(key) != expected[key] for key in ("condition_id", "scenario", "detail")):
+            return []
+    return [dict(row) for row in rows]
+
+
+def _select_release_output(
+    root: Path,
+    schedule: list[dict[str, str | None]],
+    output: Path | None,
+    resume: bool,
+) -> tuple[Path, list[dict[str, object]]]:
+    revision = _git_revision(root)
+    reports_dir = root / "data" / "v5" / "reports"
+    if output is not None:
+        rows = _load_release_resume_rows(output, schedule, revision) if resume else []
+        return output, rows
+    if resume and reports_dir.exists():
+        for candidate in sorted(reports_dir.glob("physical_release_full_*.json"), reverse=True):
+            rows = _load_release_resume_rows(candidate, schedule, revision)
+            if rows:
+                return candidate, rows
+    return reports_dir / f"physical_release_full_{datetime.now(UTC):%Y%m%d_%H%M%S}.json", []
+
+
 def _scenario_instruction(scenario: str, detail: str | None) -> str:
     if scenario == "complete":
         return "COLOCA EL ENSAMBLE COMPLETO; cambia posición y giro"
@@ -302,7 +378,7 @@ def _capture_physical_cycle(
         cv2.putText(frame, f"GRABANDO {label}", (30, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
         cv2.imshow("V5 - bateria fisica", frame)
         if cv2.waitKey(1) & 0xFF == 27:
-            break
+            return None
         sequence += 1
     actual = result.verdict.value if result is not None else Verdict.UNRELIABLE.value
     return {
@@ -400,14 +476,20 @@ def run_rehearsal(root: Path, camera_index: int, seconds: float, output: Path | 
     return result
 
 
-def run_full_release_campaign(root: Path, camera_index: int, seconds: float, output: Path | None = None) -> dict[str, object]:
+def run_full_release_campaign(
+    root: Path,
+    camera_index: int,
+    seconds: float,
+    output: Path | None = None,
+    resume: bool = True,
+) -> dict[str, object]:
     schedule = release_schedule()
+    output_path, rows = _select_release_output(root, schedule, output, resume)
     capture = _open_camera(camera_index)
     board = BoardTracker(V5BoardConfig.from_json(root / "config" / "v5" / "runtime.json"))
     inspector = V5Inspector(root)
-    rows: list[dict[str, object]] = []
     try:
-        for cycle_id, condition in enumerate(schedule, start=1):
+        for cycle_id, condition in enumerate(schedule[len(rows) :], start=len(rows) + 1):
             row = _capture_physical_cycle(
                 capture,
                 board,
@@ -421,30 +503,12 @@ def run_full_release_campaign(root: Path, camera_index: int, seconds: float, out
             if row is None:
                 break
             rows.append(row)
+            _write_release_result(_release_result(root, schedule, rows), output_path)
     finally:
         capture.release()
         cv2.destroyAllWindows()
-    complete_rows = [row for row in rows if row["scenario"] == "complete"]
-    metrics = _campaign_metrics(rows, len(schedule), max_false_rejects=1)
-    result = {
-        "schema_version": 1,
-        "kind": "physical_release_full",
-        "generated_at": datetime.now(UTC).isoformat(),
-        "git_revision": _git_revision(root),
-        "requested_count": len(schedule),
-        "completed_count": len(rows),
-        "expected_complete_count": 100,
-        "complete_pass_count": sum(row["actual_verdict"] == Verdict.PASS.value for row in complete_rows),
-        **metrics,
-        "correct_count": sum(bool(row["correct"]) for row in rows),
-        "rows": rows,
-    }
-    output_path = output or root / "data" / "v5" / "reports" / f"physical_release_full_{datetime.now(UTC):%Y%m%d_%H%M%S}.json"
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    output_path.with_suffix(output_path.suffix + ".sha256").write_text(
-        f"{sha256_file(output_path)}  {output_path.name}\n", encoding="utf-8"
-    )
+    result = _release_result(root, schedule, rows)
+    _write_release_result(result, output_path)
     return result
 
 
@@ -458,6 +522,7 @@ def main() -> int:
     parser.add_argument("--camera", type=int, default=0)
     parser.add_argument("--seconds", type=float, default=4.0)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--fresh", action="store_true", help="start a new full release campaign instead of resuming")
     args = parser.parse_args()
     root = args.root.resolve()
     if args.mode == "fixtures":
@@ -467,7 +532,7 @@ def main() -> int:
             parser.error("--scenario is required with --mode physical")
         result = run_physical_campaign(root, args.scenario, args.count, args.camera, args.seconds, args.output)
     elif args.mode == "release":
-        result = run_full_release_campaign(root, args.camera, args.seconds, args.output)
+        result = run_full_release_campaign(root, args.camera, args.seconds, args.output, resume=not args.fresh)
     else:
         result = run_rehearsal(root, args.camera, args.seconds, args.output)
     print(json.dumps({key: result[key] for key in ("kind", "false_passes", "release_ready")}, indent=2))

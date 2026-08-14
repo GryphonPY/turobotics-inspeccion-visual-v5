@@ -25,7 +25,16 @@ en pantalla qué debe prepararse en cada uno:
 
 El operador sólo pulsa ENTER cuando la escena indicada esté lista. El programa fija el caso,
 guarda el identificador y no permite cambiar la etiqueta después de ver el resultado. ESC sale
-guardando los ciclos ya terminados.
+guardando los ciclos ya terminados. El reporte se firma después de cada ciclo terminado: si la
+ventana se cierra o la cámara falla, al volver a ejecutar el mismo comando se retoma el último
+caso válido sin repetirlo. El programa sólo reanuda si coinciden el hash del reporte, la versión
+del código y el orden de la batería.
+
+Para comenzar una batería nueva desde cero, aunque exista un reporte parcial, añade `--fresh`:
+
+```powershell
+.venv\Scripts\python.exe tools\run_v5_campaign.py --mode release --camera 1 --fresh
+```
 
 Para repetir únicamente un lote, ejecuta desde la raíz del proyecto:
 
