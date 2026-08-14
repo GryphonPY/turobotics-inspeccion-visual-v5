@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import cv2
@@ -46,7 +47,10 @@ def test_tracker_detects_all_markers_and_returns_metric_roi() -> None:
 
 
 def test_tracker_refines_fast_detection_corners_before_reprojection_check(monkeypatch) -> None:
-    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    config = replace(
+        V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json"),
+        detection_width_px=960,
+    )
     source = synthetic_board()
     tracker = BoardTracker(config)
     detected = tracker._detect(source)
@@ -147,3 +151,39 @@ def test_tracker_uses_cache_for_one_bad_reprojection_frame(monkeypatch) -> None:
     assert second.board_ok
     assert second.reason == "cached_homography"
     assert second.reprojection_error_px == first.reprojection_error_px
+
+
+def test_tracker_holds_soft_reprojection_without_dropping_the_board(monkeypatch) -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    tracker = BoardTracker(config)
+    source = synthetic_board()
+    first = tracker.observe(packet(source, 1), now=1.0)
+    assert first.board_ok
+    cached_homography = tracker._last_homography
+    assert cached_homography is not None
+    tracker._frames_since_detection = config.detection_interval_frames
+
+    monkeypatch.setattr(
+        tracker,
+        "_fresh_homography",
+        lambda _found: (cached_homography, config.max_reprojection_error_px + 0.5),
+    )
+    second = tracker.observe(packet(source, 2), now=1.1)
+
+    assert second.board_ok
+    assert second.reason == "soft_reprojection"
+
+
+def test_tracker_keeps_board_during_temporary_marker_loss(monkeypatch) -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    tracker = BoardTracker(config)
+    source = synthetic_board()
+    first = tracker.observe(packet(source, 1), now=1.0)
+    assert first.board_ok
+    tracker._frames_since_detection = config.detection_interval_frames
+    monkeypatch.setattr(tracker, "_detect", lambda _frame: {})
+
+    second = tracker.observe(packet(source, 2), now=2.0)
+
+    assert second.board_ok
+    assert second.reason == "cached_homography"

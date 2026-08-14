@@ -52,6 +52,7 @@
   },
   "geometry_min": 0.85,
   "component_model_floor": 0.50,
+  "component_model_missing_max": 0.05,
   "component_pass_geometry_min": 0.60,
   "component_presence_min": 0.80,
   "component_missing_min": 0.40

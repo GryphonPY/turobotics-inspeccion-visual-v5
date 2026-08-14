@@ -34,3 +34,16 @@ def test_inspector_rejects_a_blurred_capture_as_unreliable() -> None:
 
     assert results[-1] is not None
     assert results[-1].verdict.value == "UNRELIABLE"
+
+
+def test_inspector_identifies_missing_c08_for_the_component_map() -> None:
+    inspector = V5Inspector(ROOT)
+    image = cv2.imread(str(ROOT / "tests_v5" / "fixtures" / "missing_c08.png"))
+    assert image is not None
+    snapshot = TrackingSnapshot(1, 1.0, True, image, (0, 0, 0, 0), 1.0, 0.0, 100.0)
+
+    results = [inspector(snapshot) for _ in range(5)]
+
+    assert results[-1] is not None
+    assert results[-1].verdict.value == "NO_PASS"
+    assert results[-1].components[7].value == "MISSING"

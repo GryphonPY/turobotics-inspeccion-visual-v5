@@ -73,6 +73,7 @@ class InspectionRuntime:
         self._last_verdict = None
         self._last_components: dict[str, ComponentPublicState] = {}
         self._last_board: np.ndarray | None = None
+        self._last_result_bbox = (0, 0, 0, 0)
         self._counters = {"total": 0, "passed": 0, "failed": 0, "unreliable": 0}
         self._publish_public(
             TrackingSnapshot(0, 0.0, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0, reason="starting")
@@ -172,6 +173,11 @@ class InspectionRuntime:
         if self._inspector is not None and hasattr(self._inspector, "reset"):
             self._inspector.reset()
         self._last_verdict = result.verdict
+        self._last_result_bbox = (
+            self.tracker.roi_bbox_to_board(snapshot.bbox)
+            if snapshot.board is not None
+            else snapshot.bbox
+        )
         if result.verdict is Verdict.UNRELIABLE:
             self._last_components = {
                 f"C{index:02d}": ComponentPublicState.UNKNOWN for index in range(1, 11)
@@ -320,11 +326,12 @@ class InspectionRuntime:
             display_frame = full_frame
         if display_frame is None:
             display_frame = tracked.roi
-        display_bbox = (
-            self.tracker.roi_bbox_to_board(tracked.bbox)
-            if tracked.board is not None
-            else tracked.bbox
-        )
+        if tracked.board is not None:
+            display_bbox = self.tracker.roi_bbox_to_board(tracked.bbox)
+        elif state == LiveState.RESULT and self._last_result_bbox[2] > 0:
+            display_bbox = self._last_result_bbox
+        else:
+            display_bbox = tracked.bbox
         self.public.publish(
             PublicState(
                 version=self._public_version,

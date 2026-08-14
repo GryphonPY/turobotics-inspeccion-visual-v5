@@ -93,6 +93,31 @@ def test_runtime_hides_component_claims_for_unreliable_result() -> None:
     assert set(runtime._last_components.values()) == {ComponentPublicState.UNKNOWN}
 
 
+def test_runtime_holds_result_box_during_a_transient_board_loss() -> None:
+    runtime = InspectionRuntime(ROOT)
+    runtime.live.state = LiveState.INSPECTING
+    board = np.full((2235, 1728, 3), 18, dtype=np.uint8)
+    snapshot = TrackingSnapshot(
+        1,
+        1.0,
+        True,
+        np.zeros((560, 320), dtype=np.uint8),
+        (70, 110, 180, 280),
+        1.0,
+        0.0,
+        100.0,
+        board=board,
+    )
+    result = CycleVerdict(Verdict.PASS, (ComponentPublicState.PRESENT,) * 10, 5, ())
+
+    runtime._handle_inspection_result(snapshot, result)
+    runtime._publish_public(
+        TrackingSnapshot(2, 1.1, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0),
+    )
+
+    assert runtime.latest_public_state().tracking_bbox == runtime._last_result_bbox
+
+
 def test_slow_inspector_has_one_pending_request() -> None:
     calls: list[int] = []
     calls_lock = Lock()

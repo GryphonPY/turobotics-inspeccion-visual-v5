@@ -89,6 +89,25 @@ def test_missing_component_still_blocks_component_only_pass() -> None:
     assert verdict.verdict is Verdict.NO_PASS
 
 
+def test_strong_model_absence_marks_component_missing_even_when_neighbor_overlaps() -> None:
+    judge = HybridJudge(ROOT / "config" / "v5" / "decision.json")
+    probabilities = (0.99,) * 7 + (0.001,) + (0.99,) * 2
+    evidence = GeometryEvidence(
+        usable=False,
+        global_score=0.49,
+        area_ratio=0.66,
+        aspect_score=0.60,
+        silhouette_iou=0.57,
+        local_scores={f"C{i:02d}": 0.80 for i in range(1, 11)},
+        reasons=("silhouette_incompatible", "area_incompatible"),
+    )
+
+    verdict = judge.evaluate(evidence, model(probabilities, global_value=0.001))
+
+    assert verdict.verdict is Verdict.NO_PASS
+    assert verdict.components[7] is ComponentPublicState.MISSING
+
+
 def test_voter_closes_after_five_unanimous_passes() -> None:
     voter = AdaptiveVoter()
     frame = type("Frame", (), {"verdict": Verdict.PASS, "global_score": 0.95, "components": (ComponentPublicState.PRESENT,) * 10})()

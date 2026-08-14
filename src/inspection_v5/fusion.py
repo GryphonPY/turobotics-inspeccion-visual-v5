@@ -45,6 +45,9 @@ class HybridJudge:
         self.local_low = _as_float_map(config.get("local_low"), names, 0.20)
         self.geometry_min = float(config.get("geometry_min", 0.85))
         self.component_model_floor = float(config.get("component_model_floor", 0.50))
+        self.component_model_missing_max = float(
+            config.get("component_model_missing_max", 0.05)
+        )
         self.component_pass_geometry_min = float(
             config.get("component_pass_geometry_min", self.geometry_min)
         )
@@ -63,7 +66,11 @@ class HybridJudge:
             if score >= max(self.high[name], self.component_model_floor) and local >= self.local_high[name]:
                 components.append(ComponentPublicState.PRESENT)
                 high_count += 1
-            elif score <= self.low[name] and local <= self.local_low[name]:
+            elif score <= self.component_model_missing_max and (
+                local <= self.local_low[name]
+                or not geometry.usable
+                or geometry.global_score < self.geometry_min
+            ):
                 components.append(ComponentPublicState.MISSING)
                 low_count += 1
             else:

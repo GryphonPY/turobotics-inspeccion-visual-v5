@@ -22,6 +22,7 @@ class V5BoardConfig:
     detection_width_px: int
     detection_interval_frames: int
     max_reprojection_error_px: float
+    soft_reprojection_error_px: float
     homography_cache_ms: float
     homography_hold_px: float
     display_change_threshold: float
@@ -39,6 +40,9 @@ class V5BoardConfig:
             detection_width_px=int(raw["detection_width_px"]),
             detection_interval_frames=max(1, int(raw.get("detection_interval_frames", 1))),
             max_reprojection_error_px=float(raw["max_reprojection_error_px"]),
+            soft_reprojection_error_px=float(
+                raw.get("soft_reprojection_error_px", raw["max_reprojection_error_px"])
+            ),
             homography_cache_ms=float(raw["homography_cache_ms"]),
             homography_hold_px=float(raw.get("homography_hold_px", 2.0)),
             display_change_threshold=float(raw.get("display_change_threshold", 3.0)),
@@ -246,10 +250,15 @@ class BoardTracker:
         fresh = refresh_detection and all(marker_id in found for marker_id in self.REQUIRED_IDS)
         if fresh:
             candidate, error = self._fresh_homography(found)
-            if candidate is not None and error <= self.config.max_reprojection_error_px:
+            if candidate is not None and error <= self.config.soft_reprojection_error_px:
+                soft_reprojection = error > self.config.max_reprojection_error_px
                 if (
                     self._last_homography is None
-                    or self._homography_shift(candidate, frame.shape) > self.config.homography_hold_px
+                    or (
+                        not soft_reprojection
+                        and self._homography_shift(candidate, frame.shape)
+                        > self.config.homography_hold_px
+                    )
                 ):
                     self._last_homography = candidate
                     homography_updated = True
@@ -257,6 +266,8 @@ class BoardTracker:
                 self._last_error = error
                 self._last_found_ids = found_ids
                 homography = self._last_homography
+                if soft_reprojection:
+                    reason = "soft_reprojection"
             else:
                 cache_age_ms = (
                     (now - self._last_observed_at) * 1000.0
