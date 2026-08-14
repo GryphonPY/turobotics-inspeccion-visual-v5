@@ -17,6 +17,7 @@ commit antes de iniciar el siguiente.
 - Paso 3 — interfaz de televisión, diagnóstico y launchers: implementado y revisado visualmente.
 - Paso 4 — herramientas de validación, batería física y liberación: herramientas implementadas; el challenge físico holdout ya fue capturado y evaluado. La herramienta ahora tiene un modo `release` que reúne los 440 casos físicos en un solo flujo guiado.
 - Evidencia actual: sesión `challenge_20260814_054132`, 60 ciclos programados y 1 repetición; `evaluate_v5.py --split challenge-holdout` reportó `sample_count=30`, `false_passes=0`, `false_rejects=0` y `release_ready=true`.
+- Ensayo de resistencia offline completado: `soak_20260814_065528.json`, 30 minutos, 40,980 muestras, 24 FPS sostenidos, `stage_ms_p95=53.25`, `decision_ms_p95=53.23`, `removal_ms_p95=220`, sin salida de error y `release_ready=true`; el crecimiento final de RSS fue `13.09 MB` y se conserva el reporte para revisar memoria durante la batería física.
 - Siguiente puerta: ejecutar `tools\\run_v5_campaign.py --mode release --camera <android>` y el ensayo de presentación. No se debe declarar V5 liberada ni generar el paquete final antes de esas puertas.
 - Entregable adicional solicitado: `docs/Presentacion_Inspeccion_Visual_V5.pptx` y su PDF; deck independiente con imágenes reales y diagramas sencillos, sin modificar la presentación principal.
 

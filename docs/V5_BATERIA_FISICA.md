@@ -48,3 +48,18 @@ al lado. No se edita un reporte congelado.
 
 Un fallo bloquea la liberación. No se bajan umbrales; se conserva el reporte, se corrige la
 causa y se repite la batería afectada completa.
+
+## Ensayo de resistencia ya ejecutado
+
+La prueba offline de 30 minutos terminó correctamente en `data/v5/reports/soak_20260814_065528.json`:
+
+- 40,980 muestras procesadas.
+- Previsualización estable de 24 FPS.
+- Tiempo de procesamiento p95: 53.25 ms.
+- Tiempo de decisión p95: 53.23 ms.
+- Retirada detectada p95: 220 ms.
+- Sin errores en `soak_30m_stderr.log`.
+- El reporte conserva `release_ready=true` y no sustituye la batería física.
+
+Esta evidencia demuestra estabilidad del motor bajo una fuente repetible. La liberación final
+sigue bloqueada hasta terminar los 440 casos físicos y el ensayo de presentación.
