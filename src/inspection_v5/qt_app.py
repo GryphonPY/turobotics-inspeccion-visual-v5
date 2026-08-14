@@ -4,6 +4,7 @@ import argparse
 import sys
 import time
 import traceback
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,6 +16,39 @@ from .camera_picker import choose_camera
 from .inspector import V5Inspector
 from .runtime import InspectionRuntime
 from .ui.main_window import MainWindow
+
+
+def _open_camera(
+    index: int,
+    status: Callable[[str], None] | None = None,
+    should_continue: Callable[[], bool] | None = None,
+) -> tuple[cv2.VideoCapture | None, str]:
+    """Open a camera, tolerating the short driver handoff after the picker closes."""
+    keep_trying = should_continue or (lambda: True)
+    backends: tuple[tuple[str, int | None], ...] = (
+        ("DSHOW", cv2.CAP_DSHOW),
+        ("MSMF", cv2.CAP_MSMF),
+        ("AUTO", None),
+    )
+    for attempt in range(16):
+        if not keep_trying():
+            return None, ""
+        for backend_name, backend in backends:
+            capture = cv2.VideoCapture(index, backend) if backend is not None else cv2.VideoCapture(index)
+            if not capture.isOpened():
+                capture.release()
+                continue
+            capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+            capture.set(cv2.CAP_PROP_FPS, 30)
+            ok, _ = capture.read()
+            if ok:
+                return capture, backend_name
+            capture.release()
+        if status is not None:
+            status(f"Esperando cámara {index} · intento {attempt + 1}/16")
+        time.sleep(0.25)
+    return None, ""
 
 
 def _log_launcher_error(root: Path, stage: str, exc: BaseException) -> None:
@@ -35,17 +69,12 @@ class CameraWorker(QThread):
         self._running = True
 
     def run(self) -> None:
-        capture = cv2.VideoCapture(self.index, cv2.CAP_DSHOW)
-        if not capture.isOpened():
-            capture.release()
-            capture = cv2.VideoCapture(self.index)
-        if not capture.isOpened():
+        self.status.emit(f"Conectando cámara {self.index}...")
+        capture, backend = _open_camera(self.index, self.status.emit, lambda: self._running)
+        if capture is None:
             self.status.emit(f"No se pudo abrir la cámara {self.index}")
             return
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        capture.set(cv2.CAP_PROP_FPS, 30)
-        self.status.emit("Cámara conectada")
+        self.status.emit(f"Cámara conectada · {backend}")
         while self._running:
             ok, frame = capture.read()
             if ok and frame is not None:
@@ -65,6 +94,7 @@ def run_qt_app(root: Path, camera_index: int = 0, fullscreen: bool = False) -> i
     camera = CameraWorker(camera_index)
     camera.frame_ready.connect(runtime.publish_frame)
     window = MainWindow(runtime, root)
+    camera.status.connect(window.set_camera_status)
     window.camera_worker = camera
     app.aboutToQuit.connect(camera.stop)
     runtime.start()

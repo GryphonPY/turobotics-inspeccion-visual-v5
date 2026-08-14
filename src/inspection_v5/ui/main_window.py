@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QKeyEvent, QPixmap
+from PySide6.QtGui import QCloseEvent, QKeyEvent, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -18,7 +18,7 @@ from ..contracts import PublicState
 from ..runtime import InspectionRuntime
 from .diagnostic_panel import DiagnosticPanel
 from .result_panel import ResultPanel
-from .theme import MUTED, install_fonts, stylesheet
+from .theme import GREEN, MUTED, RED, install_fonts, stylesheet
 from .video_view import TrackingVideoView
 from .view_model import PresentationViewModel
 
@@ -56,6 +56,8 @@ class MainWindow(QMainWindow):
         self.diagnostic.setGeometry(30, 100, 420, 350)
         self.panel.exit_button.clicked.connect(self.close)
         self.panel.reset_button.clicked.connect(self.runtime.reset_counters)
+        self.fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
+        self.fullscreen_shortcut.activated.connect(self.toggle_fullscreen)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(16)
@@ -91,10 +93,26 @@ class MainWindow(QMainWindow):
         frame = QFrame()
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(14, 0, 14, 0)
-        self.footer = QLabel("F2 diagnóstico  ·  ESC salir  ·  coloca la pieza dentro del rectángulo")
+        self.footer = QLabel("F2 diagnóstico  ·  F11 ventana/pantalla completa  ·  ESC salir")
         self.footer.setStyleSheet(f"color: {MUTED}; font-size: 18px;")
         layout.addWidget(self.footer)
+        layout.addStretch(1)
+        self.camera_status = QLabel("CÁMARA: INICIANDO")
+        self.camera_status.setStyleSheet(f"color: {MUTED}; font-size: 16px; font-weight: 700;")
+        layout.addWidget(self.camera_status)
         return frame
+
+    def set_camera_status(self, message: str) -> None:
+        normalized = message.upper()
+        color = RED if "NO SE PUDO" in normalized else GREEN if "CONECTADA" in normalized else MUTED
+        self.camera_status.setText(f"CÁMARA · {message.upper()}")
+        self.camera_status.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: 700;")
+
+    def toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showMaximized()
+        else:
+            self.showFullScreen()
 
     def refresh(self) -> None:
         state: PublicState = self.runtime.latest_public_state()
@@ -110,6 +128,9 @@ class MainWindow(QMainWindow):
         if event.key() == Qt.Key.Key_F2:
             self.diagnostic.setVisible(not self.diagnostic.isVisible())
             self.diagnostic.raise_()
+            return
+        if event.key() == Qt.Key.Key_F11:
+            self.toggle_fullscreen()
             return
         if event.key() == Qt.Key.Key_Escape:
             self.close()

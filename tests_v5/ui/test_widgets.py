@@ -46,3 +46,16 @@ def test_main_window_renders_at_television_size(qtbot) -> None:
     assert window.video.width() >= 780
     assert window.panel.width() <= 460
     assert not window.grab().isNull()
+
+
+def test_main_window_f11_toggles_fullscreen(qtbot) -> None:
+    runtime = InspectionRuntime(ROOT)
+    window = MainWindow(runtime, ROOT)
+    qtbot.addWidget(window)
+    window.showFullScreen()
+    qtbot.wait(20)
+
+    assert window.isFullScreen()
+    window.toggle_fullscreen()
+    qtbot.wait(20)
+    assert not window.isFullScreen()
