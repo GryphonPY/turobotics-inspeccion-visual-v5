@@ -19,6 +19,7 @@ from .contracts import (
     TrackingSnapshot,
 )
 from .diagnostics import RotatingJsonlLogger
+from .fusion import CycleVerdict
 from .latest_value import LatestValue
 from .live_state import LiveConfig, LiveController, LiveState
 from .presence import PresenceAnalyzer, PresenceConfig
@@ -68,6 +69,9 @@ class InspectionRuntime:
         self._public_version = 0
         self._last_state = self.live.state
         self._last_metrics = RuntimeMetrics(log_path=str(self.logger.path))
+        self._last_verdict = None
+        self._last_components: dict[str, ComponentPublicState] = {}
+        self._counters = {"total": 0, "passed": 0, "failed": 0, "unreliable": 0}
         self._publish_public(
             TrackingSnapshot(0, 0.0, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0, reason="starting")
         )
@@ -117,6 +121,10 @@ class InspectionRuntime:
         """Publish one inspection request; a newer request replaces an older one."""
         return self.inspection_requests.publish(snapshot)
 
+    def reset_counters(self) -> None:
+        self._counters = {"total": 0, "passed": 0, "failed": 0, "unreliable": 0}
+        self.logger.event("INFO", "counters_reset")
+
     def _inspection_loop(self) -> None:
         last_version = -1
         while not self._stop.is_set():
@@ -127,7 +135,9 @@ class InspectionRuntime:
             last_version = version
             started = time.perf_counter()
             try:
-                self._inspector(snapshot)
+                result = self._inspector(snapshot)
+                if isinstance(result, CycleVerdict):
+                    self._handle_inspection_result(snapshot, result)
                 elapsed_ms = (time.perf_counter() - started) * 1000.0
                 self.logger.event(
                     "INFO",
@@ -142,6 +152,31 @@ class InspectionRuntime:
                     repr(exc),
                     sequence=snapshot.sequence,
                 )
+
+    def _handle_inspection_result(self, snapshot: TrackingSnapshot, result: CycleVerdict) -> None:
+        self.live.result_ready()
+        self._last_verdict = result.verdict
+        self._last_components = {
+            f"C{index:02d}": result.components[index - 1]
+            if index - 1 < len(result.components)
+            else ComponentPublicState.UNKNOWN
+            for index in range(1, 11)
+        }
+        self._counters["total"] += 1
+        if result.verdict.value == "PASS":
+            self._counters["passed"] += 1
+        elif result.verdict.value == "NO_PASS":
+            self._counters["failed"] += 1
+        else:
+            self._counters["unreliable"] += 1
+        self.logger.event(
+            "INFO",
+            "inspection_result",
+            verdict=result.verdict.value,
+            frames_used=result.frames_used,
+            reasons=result.reasons,
+        )
+        self._publish_public(snapshot)
 
     def _tracking_loop(self) -> None:
         while not self._stop.is_set():
@@ -165,7 +200,14 @@ class InspectionRuntime:
                 )
                 self.tracking.publish(tracked)
                 event = self.live.update(presence, tracked.board_ok, time.monotonic())
-                if event.start_inspection:
+                if event.cancel_inspection and hasattr(self._inspector, "reset"):
+                    self._inspector.reset()
+                if event.cycle_released:
+                    self._last_verdict = None
+                    self._last_components = {}
+                if event.start_inspection or (
+                    self.live.state == LiveState.INSPECTING and self._inspector is not None
+                ):
                     self.request_inspection(tracked)
                 elapsed_ms = (time.perf_counter() - started) * 1000.0
                 self._last_metrics = RuntimeMetrics(
@@ -230,6 +272,15 @@ class InspectionRuntime:
             headline = "RETIRANDO"
             detail = "Área vacía en confirmación"
             instruction = "COLOCA LA SIGUIENTE PIEZA"
+        elif state == LiveState.RESULT and self._last_verdict is not None:
+            mode = TrackingMode.LOCKED
+            if self._last_verdict.value == "PASS":
+                mode, headline, detail = TrackingMode.PASS, "10/10 PRESENTES", "INSPECCIÓN APROBADA"
+            elif self._last_verdict.value == "NO_PASS":
+                mode, headline, detail = TrackingMode.FAIL, "NO PASA", "ENSAMBLE INCOMPLETO O DEFORMADO"
+            else:
+                mode, headline, detail = TrackingMode.FAIL, "CAPTURA NO CONFIABLE", "Repite con la pieza quieta"
+            instruction = "ESPERANDO ÁREA LIBRE"
         else:
             mode = TrackingMode.LOCKED
             headline = "RESULTADO MOSTRADO"
@@ -245,10 +296,13 @@ class InspectionRuntime:
                 headline=headline,
                 detail=detail,
                 instruction=instruction,
-                counters={"total": 0, "passed": 0, "failed": 0, "unreliable": 0},
+                verdict=self._last_verdict if state == LiveState.RESULT else None,
+                counters=dict(self._counters),
                 metrics=self._last_metrics,
                 component_states={
-                    f"C{index:02d}": ComponentPublicState.UNKNOWN
+                    f"C{index:02d}": self._last_components.get(f"C{index:02d}", ComponentPublicState.UNKNOWN)
+                    if state == LiveState.RESULT
+                    else ComponentPublicState.UNKNOWN
                     for index in range(1, 11)
                 },
             )
