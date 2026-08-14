@@ -24,3 +24,13 @@ def test_inspector_closes_a_complete_cycle_from_legacy_frame_size() -> None:
 
     assert results[-1] is not None
     assert results[-1].verdict.value == "PASS"
+
+
+def test_inspector_rejects_a_blurred_capture_as_unreliable() -> None:
+    inspector = V5Inspector(ROOT)
+    snapshot = _snapshot(ROOT / "tests_v5" / "fixtures" / "blurred.png")
+
+    results = [inspector(snapshot) for _ in range(9)]
+
+    assert results[-1] is not None
+    assert results[-1].verdict.value == "UNRELIABLE"

@@ -25,5 +25,8 @@
     "stability_seconds": 0.35,
     "empty_confirm_seconds": 0.2,
     "empty_confirm_observations": 3
+  },
+  "quality": {
+    "minimum_piece_focus": 14.0
   }
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import cv2
@@ -17,6 +18,8 @@ from .presence import PresenceAnalyzer, PresenceConfig
 class V5Inspector:
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
+        runtime_config = json.loads((self.root / "config" / "v5" / "runtime.json").read_text(encoding="utf-8"))
+        self.minimum_piece_focus = float(runtime_config.get("quality", {}).get("minimum_piece_focus", 14.0))
         reference = np.load(self.root / "data" / "v5" / "references" / "reference_v1.npz")
         self.analyzer = PresenceAnalyzer(
             PresenceConfig(reference_area_px=19_000.0, margin_px=8, minimum_blob_area_px=12)
@@ -48,6 +51,15 @@ class V5Inspector:
                 (),
                 0.0,
                 (aligned.reason or "pose_unreliable",),
+            )
+            return self.voter.add(frame)
+        if aligned.local_focus < self.minimum_piece_focus:
+            frame = FrameVerdict(
+                Verdict.UNRELIABLE,
+                (),
+                (),
+                0.0,
+                ("piece_focus_low",),
             )
             return self.voter.add(frame)
         geometry = self.geometry.evaluate(aligned)
