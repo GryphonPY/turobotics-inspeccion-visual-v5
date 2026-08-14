@@ -1,0 +1,30 @@
+{
+  "schema": "v5-v4-protection-v1",
+  "root": ".",
+  "files": {
+    "config/board_letter_v1.json": "662cfbe8493e59e8da80c787b836e212b96664534f9df86e46eeae5f206bf961",
+    "config/inspection_v1.json": "51de343afaf7978ced3086af5be26d17ce604612335e984b92d8fb5da0644e61",
+    "data/models/aux_C08_v1.joblib": "55dc6da65ffa5b82151cb4e77751390a6820b9e9ba81b2be7e152978661f983f",
+    "data/models/aux_C08_v1.json": "5968f61b9df25d93f52b66d3ffe35cacb7225cc824d13c190d38d41f82f9d128",
+    "data/references/reference_set_v1.json": "c3bdf6a76beb15a134b8c91f2e48abb513ad16c73a8a8cb5fd5f276034364529",
+    "data/references/reference_set_v1.npz": "27261c19fd0203d357e1356117059c8188021bcea0a44958eaeed66a4521c127",
+    "src/inspection_v4/__init__.py": "6b5dcf724f68e040497dcf911af970236ce15487614888a70780c4cb71a0a463",
+    "src/inspection_v4/__main__.py": "a67c172046323b0efcafe92cb83abc266d5dd4bc931d9312cde1b7bed50643db",
+    "src/inspection_v4/app.py": "111c73dd97850d6938d354153ca12f66f1401acea3abd216413cfb95b5ebb39e",
+    "src/inspection_v4/aux_model.py": "8e399ccb467ebcc442a6645e6f6d0c0f54f03833f82c7ea43891aabaef0de90c",
+    "src/inspection_v4/board.py": "44df96c25a4e8063616dd01f2ca375753083a26f3347337fe9e3e072911665d7",
+    "src/inspection_v4/camera.py": "e4214dba59cc44150e340a27c3b6c8779a3dc8abdd72553a21efcaf9396a4c89",
+    "src/inspection_v4/capture.py": "b80e96e5bf3f9adc02ea4a2d010c82e27d7a2ea1d86514a12ac0e2a822947006",
+    "src/inspection_v4/capture_app.py": "60d5e6c4cc25ff873367c37e0c2f355ac0ef21412cf3b07d64fe075e68e2ceb5",
+    "src/inspection_v4/component_guide.py": "7f1173b7acc52e31684005010755794f3d2d8c4ed02bcab143b2b9634159b3df",
+    "src/inspection_v4/components.py": "8df34abd505ac3cc4a542ee3d8c87921281af44b5b4e6f9b656f71338c301c9c",
+    "src/inspection_v4/config.py": "336d13e781346cbb839679afa782135a7caa990da22230301ccac025b093a382",
+    "src/inspection_v4/decision.py": "36b326c7d79274c88e35768a206d59c0374e30aa6ec4ac6a006ebde8f9acf083",
+    "src/inspection_v4/display.py": "c1121fd9559788d6828bcd18d5f14cb8ad1ec5d1804edbdc36916263883f0495",
+    "src/inspection_v4/piece.py": "6b37368f65142db703493465ba1008405623f0ab4b7a4ec079ed3dd890b56430",
+    "src/inspection_v4/quality.py": "4001b3462cd87285ec8308f0eda78a5d13165447baf79c36ea0d50b6bcc1aa45",
+    "src/inspection_v4/storage.py": "c69c09ed5df4122aa1f2eeb3cc2c251a0e48acdd3ad6abba242b60d9013762f3",
+    "src/inspection_v4/types.py": "ac41ac58e447c9b5b6e8aa790ba062b5c656e3700f6d2fecfe63b1d01afef028",
+    "src/inspection_v4/workflow.py": "19c2d127496855beba6791822c0c293f21c3835264c76a6ca86858d85cede66c"
+  }
+}
