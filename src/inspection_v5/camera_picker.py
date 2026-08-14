@@ -79,10 +79,14 @@ class CameraPicker(QDialog):
             return None
         return int(self.combo.currentText().split()[-1])
 
-    def closeEvent(self, event: object) -> None:
-        self.timer.stop()
+    def release_capture(self) -> None:
         if self.capture is not None:
             self.capture.release()
+            self.capture = None
+
+    def closeEvent(self, event: object) -> None:
+        self.timer.stop()
+        self.release_capture()
         super().closeEvent(event)
 
 
@@ -94,10 +98,16 @@ def choose_camera(root: Path, app: object) -> int | None:
     if config_path.exists():
         selected = int(json.loads(config_path.read_text(encoding="utf-8")).get("index", 0))
     dialog = CameraPicker(root, indices, selected)
-    if dialog.exec() != QDialog.DialogCode.Accepted:
-        return None
-    index = dialog.selected_index()
-    if index is not None:
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(json.dumps({"index": index, "updated_at": time.time()}, indent=2) + "\n", encoding="utf-8")
-    return index
+    try:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        index = dialog.selected_index()
+        if index is not None:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            config_path.write_text(
+                json.dumps({"index": index, "updated_at": time.time()}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+        return index
+    finally:
+        dialog.release_capture()
