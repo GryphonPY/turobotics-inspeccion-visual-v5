@@ -199,7 +199,17 @@ class BoardTracker:
                 self._last_error = error
                 homography = self._last_homography
             else:
-                reason = "reprojection_error" if candidate is not None else "homography_failed"
+                cache_age_ms = (
+                    (now - self._last_observed_at) * 1000.0
+                    if self._last_observed_at is not None
+                    else float("inf")
+                )
+                if self._last_homography is not None and cache_age_ms <= self.config.homography_cache_ms:
+                    homography = self._last_homography
+                    error = self._last_error
+                    reason = "cached_homography"
+                else:
+                    reason = "reprojection_error" if candidate is not None else "homography_failed"
         elif self._last_homography is not None and self._last_observed_at is not None:
             age_ms = (now - self._last_observed_at) * 1000.0
             if age_ms <= self.config.homography_cache_ms:

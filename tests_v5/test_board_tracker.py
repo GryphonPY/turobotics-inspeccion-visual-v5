@@ -126,3 +126,24 @@ def test_tracker_uses_short_homography_cache_for_temporary_marker_loss() -> None
     assert second.board_ok
     assert second.reason == "cached_homography"
     assert abs(second.homography_age_ms - 100.0) < 0.01
+
+
+def test_tracker_uses_cache_for_one_bad_reprojection_frame(monkeypatch) -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    tracker = BoardTracker(config)
+    source = synthetic_board()
+    first = tracker.observe(packet(source, 1), now=1.0)
+    assert first.board_ok
+    cached_homography = tracker._last_homography
+    assert cached_homography is not None
+
+    monkeypatch.setattr(
+        tracker,
+        "_fresh_homography",
+        lambda _found: (cached_homography, config.max_reprojection_error_px + 4.0),
+    )
+    second = tracker.observe(packet(source, 2), now=1.1)
+
+    assert second.board_ok
+    assert second.reason == "cached_homography"
+    assert second.reprojection_error_px == first.reprojection_error_px
