@@ -10,6 +10,14 @@ commit antes de iniciar el siguiente.
 
 **Tech Stack:** Python 3.11, OpenCV contrib, NumPy, PySide6, ONNX Runtime, PyTorch sólo para entrenamiento, pytest, Ruff, PowerShell y Git.
 
+## Estado de ejecución
+
+- Paso 1 — base, rendimiento y modo live: implementado y verificado.
+- Paso 2 — juez híbrido, ONNX y campaña de fixtures: implementado; la campaña local actual reporta cero falsos `PASA`.
+- Paso 3 — interfaz de televisión, diagnóstico y launchers: implementado y revisado visualmente.
+- Paso 4 — herramientas de validación, batería física y liberación: herramientas implementadas; la evidencia física todavía no existe.
+- Punto de detención actual: ejecutar `tools\\capture_challenge_v5.py` con el Android y las piezas reales. No se debe declarar V5 liberada ni generar el paquete final antes de esa captura.
+
 ## Global Constraints
 
 - La especificación normativa es `docs/superpowers/specs/2026-08-13-v5-television-rebuild-design.md`.
@@ -25,21 +33,21 @@ commit antes de iniciar el siguiente.
 
 ## Orden obligatorio
 
-- [ ] **Paso 1: Ejecutar el plan de base, rendimiento y modo live**
+- [x] **Paso 1: Ejecutar el plan de base, rendimiento y modo live**
 
 Documento: `docs/superpowers/plans/2026-08-13-v5-foundation-live.md`
 
 Salida exigida: V5 arranca con un motor simulado, seguimiento desacoplado y ciclos automáticos
 de entrada/retirada, mientras V4 conserva hashes idénticos.
 
-- [ ] **Paso 2: Ejecutar el plan del juez híbrido**
+- [x] **Paso 2: Ejecutar el plan del juez híbrido**
 
 Documento: `docs/superpowers/plans/2026-08-13-v5-hybrid-judge.md`
 
 Salida exigida: motor offline capaz de producir `PASA`, `NO PASA` y
 `CAPTURA NO CONFIABLE`, con artefacto ONNX versionado y prueba adversarial congelada.
 
-- [ ] **Paso 3: Ejecutar el plan de interfaz para televisión**
+- [x] **Paso 3: Ejecutar el plan de interfaz para televisión**
 
 Documento: `docs/superpowers/plans/2026-08-13-v5-television-ui.md`
 
