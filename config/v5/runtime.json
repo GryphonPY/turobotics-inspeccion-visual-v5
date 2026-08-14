@@ -13,5 +13,17 @@
   "roi_output_px": [320, 560],
   "detection_width_px": 960,
   "max_reprojection_error_px": 3.0,
-  "homography_cache_ms": 300.0
+  "homography_cache_ms": 300.0,
+  "presence": {
+    "reference_area_px": 19000.0,
+    "margin_px": 20,
+    "minimum_blob_area_px": 20,
+    "morphology_open_px": 3,
+    "morphology_close_px": 5,
+    "occupied_enter_ratio": 0.35,
+    "empty_exit_ratio": 0.12,
+    "stability_seconds": 0.35,
+    "empty_confirm_seconds": 0.2,
+    "empty_confirm_observations": 3
+  }
 }
