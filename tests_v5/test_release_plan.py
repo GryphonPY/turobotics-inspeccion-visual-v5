@@ -35,3 +35,11 @@ def test_unsafe_capture_can_be_rejected_without_being_exactly_unreliable() -> No
     assert not _accepted_actual("hand", Verdict.PASS.value)
     assert _accepted_actual("complete", Verdict.PASS.value)
     assert not _accepted_actual("complete", Verdict.NO_PASS.value)
+
+
+def test_component_defect_requires_no_pass_for_release() -> None:
+    assert _accepted_actual("single_missing", Verdict.NO_PASS.value)
+    assert not _accepted_actual("single_missing", Verdict.UNRELIABLE.value)
+    assert not _accepted_actual("single_missing", Verdict.PASS.value)
+    assert _accepted_actual("rearranged", Verdict.NO_PASS.value)
+    assert not _accepted_actual("rearranged", Verdict.UNRELIABLE.value)

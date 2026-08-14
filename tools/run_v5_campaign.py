@@ -203,6 +203,25 @@ def _accepted_actual(scenario: str, actual: str) -> bool:
     return actual == expected
 
 
+def _campaign_metrics(rows: list[dict[str, object]], requested_count: int, max_false_rejects: int = 0) -> dict[str, object]:
+    false_passes = sum(bool(row["false_pass"]) for row in rows)
+    false_rejects = sum(
+        row["scenario"] == "complete" and row["actual_verdict"] != Verdict.PASS.value for row in rows
+    )
+    incorrect_count = sum(not bool(row["correct"]) for row in rows)
+    return {
+        "false_passes": false_passes,
+        "false_rejects": false_rejects,
+        "incorrect_count": incorrect_count,
+        "release_ready": (
+            len(rows) == requested_count
+            and false_passes == 0
+            and incorrect_count == 0
+            and false_rejects <= max_false_rejects
+        ),
+    }
+
+
 def _scenario_instruction(scenario: str, detail: str | None) -> str:
     if scenario == "complete":
         return "COLOCA EL ENSAMBLE COMPLETO; cambia posición y giro"
@@ -311,7 +330,7 @@ def run_physical_campaign(root: Path, scenario: str, count: int, camera_index: i
     finally:
         capture.release()
         cv2.destroyAllWindows()
-    false_passes = sum(bool(row["false_pass"]) for row in rows)
+    metrics = _campaign_metrics(rows, count)
     result = {
         "schema_version": 1,
         "kind": "physical_release",
@@ -320,9 +339,8 @@ def run_physical_campaign(root: Path, scenario: str, count: int, camera_index: i
         "scenario": scenario,
         "requested_count": count,
         "completed_count": len(rows),
-        "false_passes": false_passes,
+        **metrics,
         "correct_count": sum(bool(row["correct"]) for row in rows),
-        "release_ready": len(rows) == count and false_passes == 0,
         "rows": rows,
     }
     output_path = output or root / "data" / "v5" / "reports" / f"physical_release_{datetime.now(UTC):%Y%m%d_%H%M%S}.json"
@@ -349,7 +367,6 @@ def run_rehearsal(root: Path, camera_index: int, seconds: float, output: Path | 
     finally:
         capture.release()
         cv2.destroyAllWindows()
-    false_passes = sum(bool(row["false_pass"]) for row in rows)
     duplicate_cycle_ids = len(rows) - len({int(row["cycle_id"]) for row in rows})
     result = {
         "schema_version": 1,
@@ -360,9 +377,14 @@ def run_rehearsal(root: Path, camera_index: int, seconds: float, output: Path | 
         "completed_count": len(rows),
         "expected_passes": 30,
         "actual_correct": sum(bool(row["correct"]) for row in rows),
-        "false_passes": false_passes,
+        "false_passes": sum(bool(row["false_pass"]) for row in rows),
         "duplicate_cycle_ids": duplicate_cycle_ids,
-        "release_ready": len(rows) == len(schedule) and false_passes == 0 and duplicate_cycle_ids == 0,
+        "release_ready": (
+            len(rows) == len(schedule)
+            and all(bool(row["correct"]) for row in rows)
+            and not any(bool(row["false_pass"]) for row in rows)
+            and duplicate_cycle_ids == 0
+        ),
         "rows": rows,
     }
     output_path = output or root / "data" / "v5" / "reports" / f"rehearsal_{datetime.now(UTC):%Y%m%d_%H%M%S}.json"
@@ -398,11 +420,8 @@ def run_full_release_campaign(root: Path, camera_index: int, seconds: float, out
     finally:
         capture.release()
         cv2.destroyAllWindows()
-    false_passes = sum(bool(row["false_pass"]) for row in rows)
-    false_rejects = sum(
-        row["scenario"] == "complete" and row["actual_verdict"] != Verdict.PASS.value for row in rows
-    )
     complete_rows = [row for row in rows if row["scenario"] == "complete"]
+    metrics = _campaign_metrics(rows, len(schedule), max_false_rejects=1)
     result = {
         "schema_version": 1,
         "kind": "physical_release_full",
@@ -412,14 +431,8 @@ def run_full_release_campaign(root: Path, camera_index: int, seconds: float, out
         "completed_count": len(rows),
         "expected_complete_count": 100,
         "complete_pass_count": sum(row["actual_verdict"] == Verdict.PASS.value for row in complete_rows),
-        "false_passes": false_passes,
-        "false_rejects": false_rejects,
+        **metrics,
         "correct_count": sum(bool(row["correct"]) for row in rows),
-        "release_ready": (
-            len(rows) == len(schedule)
-            and false_passes == 0
-            and false_rejects <= 1
-        ),
         "rows": rows,
     }
     output_path = output or root / "data" / "v5" / "reports" / f"physical_release_full_{datetime.now(UTC):%Y%m%d_%H%M%S}.json"
