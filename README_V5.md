@@ -12,6 +12,15 @@ V5 es la aplicación nueva y paralela. V4 queda intacta como respaldo.
 
 `CAMBIAR_CAMARA_V5.bat` vuelve a abrir el selector. `ESC` o el botón `Salir` cierran la cámara y los trabajadores. `F2` muestra diagnóstico técnico.
 
+## Material para la presentación
+
+Se generó un deck independiente, con imágenes reales de la interfaz y diagramas sencillos:
+
+- [Presentacion_Inspeccion_Visual_V5.pptx](docs/Presentacion_Inspeccion_Visual_V5.pptx)
+- [Presentacion_Inspeccion_Visual_V5.pdf](docs/Presentacion_Inspeccion_Visual_V5.pdf)
+
+No modifica la presentación principal del proyecto; sus diapositivas se pueden insertar cuando convenga.
+
 ## Validación y liberación
 
 La campaña de fixtures reproducible se ejecuta con:

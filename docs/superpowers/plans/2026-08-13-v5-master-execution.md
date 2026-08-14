@@ -18,6 +18,7 @@ commit antes de iniciar el siguiente.
 - Paso 4 — herramientas de validación, batería física y liberación: herramientas implementadas; el challenge físico holdout ya fue capturado y evaluado.
 - Evidencia actual: sesión `challenge_20260814_054132`, 60 ciclos programados y 1 repetición; `evaluate_v5.py --split challenge-holdout` reportó `sample_count=30`, `false_passes=0`, `false_rejects=0` y `release_ready=true`.
 - Siguiente puerta: ejecutar la batería física completa de liberación y el ensayo de presentación. No se debe declarar V5 liberada ni generar el paquete final antes de esas puertas.
+- Entregable adicional solicitado: `docs/Presentacion_Inspeccion_Visual_V5.pptx` y su PDF; deck independiente con imágenes reales y diagramas sencillos, sin modificar la presentación principal.
 
 ## Global Constraints
 
