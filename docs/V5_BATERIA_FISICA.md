@@ -16,13 +16,25 @@ cambiarlas después de ver el resultado.
 - `blur`: 20 con desenfoque o movimiento.
 - `bad_light`: 20 con iluminación intencionalmente mala.
 
-Para un lote, ejecuta desde la raíz del proyecto:
+La herramienta puede ejecutar toda la batería en un solo flujo guiado —440 ciclos— y mostrar
+en pantalla qué debe prepararse en cada uno:
+
+```powershell
+.venv\Scripts\python.exe tools\run_v5_campaign.py --mode release --camera 1
+```
+
+El operador sólo pulsa ENTER cuando la escena indicada esté lista. El programa fija el caso,
+guarda el identificador y no permite cambiar la etiqueta después de ver el resultado. ESC sale
+guardando los ciclos ya terminados.
+
+Para repetir únicamente un lote, ejecuta desde la raíz del proyecto:
 
 ```powershell
 .venv\Scripts\python.exe tools\run_v5_campaign.py --mode physical --scenario complete --count 100 --camera 1
 ```
 
-Cambia `complete` por el escenario correspondiente y `1` por el índice real del Android.
+En el flujo completo, la herramienta indica automáticamente el componente que debe retirarse.
+En un lote manual, cambia `complete` por el escenario correspondiente y `1` por el índice real del Android.
 Pulsa ENTER cuando la escena esté lista; ESC detiene sin alterar las etiquetas ya guardadas.
 Cada reporte queda en `data/v5/reports/physical_release_<fecha>.json` y su SHA-256 se guarda
 al lado. No se edita un reporte congelado.

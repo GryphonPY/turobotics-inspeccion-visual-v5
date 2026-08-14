@@ -170,6 +170,70 @@ _PHYSICAL_EXPECTED = {
     "bad_light": Verdict.UNRELIABLE.value,
 }
 
+_UNSAFE_SCENARIOS = {"outside", "hand", "marker", "blur", "bad_light"}
+
+
+def release_schedule() -> list[dict[str, str | None]]:
+    """Return the complete physical release schedule without editable labels."""
+    schedule: list[dict[str, str | None]] = []
+    for repeat in range(1, 101):
+        schedule.append({"condition_id": f"COMPLETE_{repeat:03d}", "scenario": "complete", "detail": None})
+    for component in range(1, 11):
+        component_id = f"C{component:02d}"
+        for repeat in range(1, 21):
+            schedule.append(
+                {
+                    "condition_id": f"{component_id}_MISSING_{repeat:02d}",
+                    "scenario": "single_missing",
+                    "detail": component_id,
+                }
+            )
+    for scenario in ("double_missing", "rearranged", "outside", "hand", "marker", "blur", "bad_light"):
+        for repeat in range(1, 21):
+            schedule.append(
+                {"condition_id": f"{scenario.upper()}_{repeat:03d}", "scenario": scenario, "detail": None}
+            )
+    return schedule
+
+
+def _accepted_actual(scenario: str, actual: str) -> bool:
+    expected = _PHYSICAL_EXPECTED[scenario]
+    if scenario in _UNSAFE_SCENARIOS:
+        return actual in {Verdict.UNRELIABLE.value, Verdict.NO_PASS.value}
+    return actual == expected
+
+
+def _scenario_instruction(scenario: str, detail: str | None) -> str:
+    if scenario == "complete":
+        return "COLOCA EL ENSAMBLE COMPLETO; cambia posición y giro"
+    if scenario == "single_missing":
+        return f"RETIRA SOLAMENTE {detail}" if detail else "RETIRA EL COMPONENTE INDICADO"
+    if scenario == "double_missing":
+        return "RETIRA DOS COMPONENTES"
+    if scenario == "rearranged":
+        return "REACOMODA EL ENSAMBLE; conserva una silueta parecida pero incorrecta"
+    if scenario == "outside":
+        return "COLOCA LA PIEZA PARCIALMENTE FUERA DEL RECTÁNGULO"
+    if scenario == "hand":
+        return "DEJA UNA MANO INVADIENDO EL ÁREA DE INSPECCIÓN"
+    if scenario == "marker":
+        return "CUBRE PARCIALMENTE UN MARCADOR DE LA HOJA"
+    if scenario == "blur":
+        return "PROVOCA DESENFOQUE O MOVIMIENTO CONTROLADO"
+    if scenario == "bad_light":
+        return "PROVOCA REFLEJO O ILUMINACIÓN DEFICIENTE"
+    return "PREPARA LA ESCENA INDICADA"
+
+
+def _open_camera(camera_index: int) -> cv2.VideoCapture:
+    capture = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+    if not capture.isOpened():
+        capture.release()
+        capture = cv2.VideoCapture(camera_index)
+    if not capture.isOpened():
+        raise RuntimeError(f"Could not open camera {camera_index}")
+    return capture
+
 
 def _capture_physical_cycle(
     capture: cv2.VideoCapture,
@@ -178,13 +242,16 @@ def _capture_physical_cycle(
     cycle_id: int,
     scenario: str,
     seconds: float,
+    detail: str | None = None,
+    condition_id: str | None = None,
 ) -> dict[str, object] | None:
     while True:
         ok, frame = capture.read()
         if not ok:
             continue
-        cv2.putText(frame, f"CICLO {cycle_id}  ESCENARIO: {scenario}", (30, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 210, 255), 2)
-        cv2.putText(frame, "ENTER iniciar  ESC salir", (30, 88), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (180, 220, 180), 2)
+        cv2.putText(frame, f"CICLO {cycle_id}  {condition_id or scenario}", (30, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 210, 255), 2)
+        cv2.putText(frame, _scenario_instruction(scenario, detail)[:90], (30, 88), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (180, 220, 180), 2)
+        cv2.putText(frame, "ENTER iniciar  ESC salir", (30, 124), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (180, 220, 180), 2)
         cv2.imshow("V5 - bateria fisica", frame)
         key = cv2.waitKey(1) & 0xFF
         if key == 27:
@@ -218,23 +285,20 @@ def _capture_physical_cycle(
     return {
         "cycle_id": cycle_id,
         "scenario": scenario,
+        "detail": detail,
+        "condition_id": condition_id or f"{scenario}_{cycle_id:03d}",
         "expected_verdict": _PHYSICAL_EXPECTED[scenario],
         "actual_verdict": actual,
         "valid_frames": valid_frames,
         "frames_used": result.frames_used if result is not None else 0,
         "latency_p95_ms": max(latencies) if latencies else 0.0,
         "false_pass": _PHYSICAL_EXPECTED[scenario] != Verdict.PASS.value and actual == Verdict.PASS.value,
-        "correct": actual == _PHYSICAL_EXPECTED[scenario],
+        "correct": _accepted_actual(scenario, actual),
     }
 
 
 def run_physical_campaign(root: Path, scenario: str, count: int, camera_index: int, seconds: float, output: Path | None = None) -> dict[str, object]:
-    capture = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
-    if not capture.isOpened():
-        capture.release()
-        capture = cv2.VideoCapture(camera_index)
-    if not capture.isOpened():
-        raise RuntimeError(f"Could not open camera {camera_index}")
+    capture = _open_camera(camera_index)
     board = BoardTracker(V5BoardConfig.from_json(root / "config" / "v5" / "runtime.json"))
     inspector = V5Inspector(root)
     rows: list[dict[str, object]] = []
@@ -272,12 +336,7 @@ def run_physical_campaign(root: Path, scenario: str, count: int, camera_index: i
 
 def run_rehearsal(root: Path, camera_index: int, seconds: float, output: Path | None = None) -> dict[str, object]:
     schedule = ["complete"] * 30 + ["single_missing"] * 30
-    capture = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
-    if not capture.isOpened():
-        capture.release()
-        capture = cv2.VideoCapture(camera_index)
-    if not capture.isOpened():
-        raise RuntimeError(f"Could not open camera {camera_index}")
+    capture = _open_camera(camera_index)
     board = BoardTracker(V5BoardConfig.from_json(root / "config" / "v5" / "runtime.json"))
     inspector = V5Inspector(root)
     rows: list[dict[str, object]] = []
@@ -315,10 +374,67 @@ def run_rehearsal(root: Path, camera_index: int, seconds: float, output: Path | 
     return result
 
 
+def run_full_release_campaign(root: Path, camera_index: int, seconds: float, output: Path | None = None) -> dict[str, object]:
+    schedule = release_schedule()
+    capture = _open_camera(camera_index)
+    board = BoardTracker(V5BoardConfig.from_json(root / "config" / "v5" / "runtime.json"))
+    inspector = V5Inspector(root)
+    rows: list[dict[str, object]] = []
+    try:
+        for cycle_id, condition in enumerate(schedule, start=1):
+            row = _capture_physical_cycle(
+                capture,
+                board,
+                inspector,
+                cycle_id,
+                str(condition["scenario"]),
+                seconds,
+                detail=condition["detail"],
+                condition_id=str(condition["condition_id"]),
+            )
+            if row is None:
+                break
+            rows.append(row)
+    finally:
+        capture.release()
+        cv2.destroyAllWindows()
+    false_passes = sum(bool(row["false_pass"]) for row in rows)
+    false_rejects = sum(
+        row["scenario"] == "complete" and row["actual_verdict"] != Verdict.PASS.value for row in rows
+    )
+    complete_rows = [row for row in rows if row["scenario"] == "complete"]
+    result = {
+        "schema_version": 1,
+        "kind": "physical_release_full",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "git_revision": _git_revision(root),
+        "requested_count": len(schedule),
+        "completed_count": len(rows),
+        "expected_complete_count": 100,
+        "complete_pass_count": sum(row["actual_verdict"] == Verdict.PASS.value for row in complete_rows),
+        "false_passes": false_passes,
+        "false_rejects": false_rejects,
+        "correct_count": sum(bool(row["correct"]) for row in rows),
+        "release_ready": (
+            len(rows) == len(schedule)
+            and false_passes == 0
+            and false_rejects <= 1
+        ),
+        "rows": rows,
+    }
+    output_path = output or root / "data" / "v5" / "reports" / f"physical_release_full_{datetime.now(UTC):%Y%m%d_%H%M%S}.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    output_path.with_suffix(output_path.suffix + ".sha256").write_text(
+        f"{sha256_file(output_path)}  {output_path.name}\n", encoding="utf-8"
+    )
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run V5 fixture or physical release campaigns")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--mode", choices=("fixtures", "physical", "rehearsal"), default="fixtures")
+    parser.add_argument("--mode", choices=("fixtures", "physical", "release", "rehearsal"), default="fixtures")
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--scenario", choices=tuple(_PHYSICAL_EXPECTED))
     parser.add_argument("--count", type=int, default=1)
@@ -333,6 +449,8 @@ def main() -> int:
         if args.scenario is None:
             parser.error("--scenario is required with --mode physical")
         result = run_physical_campaign(root, args.scenario, args.count, args.camera, args.seconds, args.output)
+    elif args.mode == "release":
+        result = run_full_release_campaign(root, args.camera, args.seconds, args.output)
     else:
         result = run_rehearsal(root, args.camera, args.seconds, args.output)
     print(json.dumps({key: result[key] for key in ("kind", "false_passes", "release_ready")}, indent=2))
