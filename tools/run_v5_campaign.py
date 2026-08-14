@@ -209,14 +209,18 @@ def _campaign_metrics(rows: list[dict[str, object]], requested_count: int, max_f
         row["scenario"] == "complete" and row["actual_verdict"] != Verdict.PASS.value for row in rows
     )
     incorrect_count = sum(not bool(row["correct"]) for row in rows)
+    non_complete_incorrect_count = sum(
+        row["scenario"] != "complete" and not bool(row["correct"]) for row in rows
+    )
     return {
         "false_passes": false_passes,
         "false_rejects": false_rejects,
         "incorrect_count": incorrect_count,
+        "non_complete_incorrect_count": non_complete_incorrect_count,
         "release_ready": (
             len(rows) == requested_count
             and false_passes == 0
-            and incorrect_count == 0
+            and non_complete_incorrect_count == 0
             and false_rejects <= max_false_rejects
         ),
     }

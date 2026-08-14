@@ -1,7 +1,7 @@
 from collections import Counter
 
 from inspection_v5.contracts import Verdict
-from tools.run_v5_campaign import _accepted_actual, release_schedule
+from tools.run_v5_campaign import _accepted_actual, _campaign_metrics, release_schedule
 
 
 def test_full_release_schedule_has_all_required_physical_cases() -> None:
@@ -43,3 +43,21 @@ def test_component_defect_requires_no_pass_for_release() -> None:
     assert not _accepted_actual("single_missing", Verdict.PASS.value)
     assert _accepted_actual("rearranged", Verdict.NO_PASS.value)
     assert not _accepted_actual("rearranged", Verdict.UNRELIABLE.value)
+
+
+def test_release_metrics_allow_one_complete_false_reject_but_no_defect_error() -> None:
+    complete_false_reject = {
+        "scenario": "complete",
+        "actual_verdict": Verdict.NO_PASS.value,
+        "false_pass": False,
+        "correct": False,
+    }
+    assert _campaign_metrics([complete_false_reject], 1, max_false_rejects=1)["release_ready"]
+
+    defect_error = {
+        "scenario": "single_missing",
+        "actual_verdict": Verdict.UNRELIABLE.value,
+        "false_pass": False,
+        "correct": False,
+    }
+    assert not _campaign_metrics([defect_error], 1, max_false_rejects=1)["release_ready"]
