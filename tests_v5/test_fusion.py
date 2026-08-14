@@ -34,6 +34,34 @@ def test_disagreement_never_produces_pass() -> None:
     assert any("judge_disagreement" in reason for reason in verdict.reasons)
 
 
+def test_complete_components_can_pass_when_global_head_is_unreliable() -> None:
+    judge = HybridJudge(ROOT / "config" / "v5" / "decision.json")
+    evidence = GeometryEvidence(
+        usable=False,
+        global_score=0.74,
+        area_ratio=1.18,
+        aspect_score=0.95,
+        silhouette_iou=0.73,
+        local_scores={f"C{i:02d}": 0.80 for i in range(1, 11)},
+        reasons=("silhouette_incompatible",),
+    )
+
+    verdict = judge.evaluate(evidence, model((0.99,) * 10, global_value=0.0))
+
+    assert verdict.verdict is Verdict.PASS
+
+
+def test_missing_component_still_blocks_component_only_pass() -> None:
+    judge = HybridJudge(ROOT / "config" / "v5" / "decision.json")
+    local_scores = {f"C{i:02d}": 0.80 for i in range(1, 11)}
+    local_scores["C01"] = 0.20
+    probabilities = (0.0,) + (0.99,) * 9
+
+    verdict = judge.evaluate(geometry(), model(probabilities, global_value=0.0))
+
+    assert verdict.verdict is Verdict.NO_PASS
+
+
 def test_voter_closes_after_five_unanimous_passes() -> None:
     voter = AdaptiveVoter()
     frame = type("Frame", (), {"verdict": Verdict.PASS, "global_score": 0.95, "components": (ComponentPublicState.PRESENT,) * 10})()

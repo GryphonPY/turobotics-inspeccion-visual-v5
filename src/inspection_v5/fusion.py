@@ -44,6 +44,10 @@ class HybridJudge:
         self.local_high = _as_float_map(config.get("local_high"), names, 0.45)
         self.local_low = _as_float_map(config.get("local_low"), names, 0.20)
         self.geometry_min = float(config.get("geometry_min", 0.85))
+        self.component_model_floor = float(config.get("component_model_floor", 0.50))
+        self.component_pass_geometry_min = float(
+            config.get("component_pass_geometry_min", self.geometry_min)
+        )
 
     def evaluate(self, geometry: GeometryEvidence, model: ModelEvidence) -> FrameVerdict:
         if len(model.component_probabilities) != 10:
@@ -56,7 +60,7 @@ class HybridJudge:
         for index, name in enumerate(self.names):
             local = float(geometry.local_scores.get(name, 0.0))
             score = scores[index]
-            if score >= self.high[name] and local >= self.local_high[name]:
+            if score >= max(self.high[name], self.component_model_floor) and local >= self.local_high[name]:
                 components.append(ComponentPublicState.PRESENT)
                 high_count += 1
             elif score <= self.low[name] and local <= self.local_low[name]:
@@ -67,10 +71,13 @@ class HybridJudge:
                 reasons.append(f"{name}:judge_disagreement")
         if not geometry.usable or geometry.global_score < self.geometry_min:
             reasons.extend(geometry.reasons or ("geometry_incompatible",))
-        if model.global_probability >= self.global_high and high_count == 10 and geometry.usable:
+        all_components_present = high_count == 10
+        if all_components_present and geometry.global_score >= self.component_pass_geometry_min:
             return FrameVerdict(Verdict.PASS, tuple(components), scores, model.global_probability, tuple(reasons))
-        if low_count or model.global_probability <= self.global_low:
+        if low_count or (model.global_probability <= self.global_low and not all_components_present):
             return FrameVerdict(Verdict.NO_PASS, tuple(components), scores, model.global_probability, tuple(reasons))
+        if model.global_probability >= self.global_high and all_components_present and geometry.usable:
+            return FrameVerdict(Verdict.PASS, tuple(components), scores, model.global_probability, tuple(reasons))
         if not geometry.usable or geometry.global_score < self.geometry_min:
             return FrameVerdict(Verdict.UNRELIABLE, tuple(components), scores, model.global_probability, tuple(reasons))
         return FrameVerdict(Verdict.UNRELIABLE, tuple(components), scores, model.global_probability, tuple(reasons))
