@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
+from statistics import median
 
 from .presence import PresenceMetrics
 
@@ -42,6 +44,7 @@ class LiveController:
         self._stable_since: float | None = None
         self._empty_since: float | None = None
         self._empty_observations = 0
+        self._motion_history: deque[float] = deque(maxlen=3)
 
     def _event(
         self,
@@ -72,18 +75,30 @@ class LiveController:
         self._stable_since = None
         self._empty_since = None
         self._empty_observations = 0
+        self._motion_history.clear()
 
     def update(self, metrics: PresenceMetrics, board_ok: bool, now: float) -> LiveEvent:
         occupied = metrics.occupied_ratio >= self.config.occupied_enter_ratio
         empty = metrics.occupied_ratio <= self.config.empty_exit_ratio
-        stable = metrics.motion <= self.config.motion_stable_max
 
         if not board_ok:
             self._stable_since = None
+            self._motion_history.clear()
             if self.state == LiveState.REMOVING:
                 self._empty_since = None
                 self._empty_observations = 0
             return self._event("REVISAR TABLERO")
+
+        if empty:
+            self._motion_history.clear()
+        else:
+            self._motion_history.append(metrics.motion)
+        stable_motion = (
+            metrics.motion
+            if len(self._motion_history) < self._motion_history.maxlen
+            else median(self._motion_history)
+        )
+        stable = bool(self._motion_history) and stable_motion <= self.config.motion_stable_max
 
         if self.state == LiveState.EMPTY:
             if occupied:

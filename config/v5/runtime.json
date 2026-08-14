@@ -14,6 +14,7 @@
   "detection_width_px": 960,
   "max_reprojection_error_px": 3.0,
   "homography_cache_ms": 300.0,
+  "homography_hold_px": 2.0,
   "presence": {
     "reference_area_px": 19000.0,
     "margin_px": 20,

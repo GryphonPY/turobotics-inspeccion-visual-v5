@@ -45,6 +45,35 @@ def test_tracker_detects_all_markers_and_returns_metric_roi() -> None:
     assert observation.reprojection_error_px < 1.1
 
 
+def test_tracker_returns_full_canonical_board_and_roi() -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    observation = BoardTracker(config).observe(packet(synthetic_board()), now=1.0)
+
+    assert observation.board is not None
+    assert observation.board.shape[:2] == (2235, 1728)
+    assert observation.roi is not None
+    assert observation.roi.shape[:2] == (560, 320)
+
+
+def test_tracker_holds_small_homography_jitter() -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    tracker = BoardTracker(config)
+    source = synthetic_board()
+    first = tracker.observe(packet(source, 1), now=1.0)
+    shifted = cv2.warpAffine(source, np.float32([[1, 0, 0.6], [0, 1, 0.4]]), source.shape[1::-1])
+    second = tracker.observe(packet(shifted, 2), now=1.1)
+
+    assert first.board is not None and second.board is not None
+    assert float(np.mean(cv2.absdiff(first.board, second.board))) < 2.0
+
+
+def test_tracker_converts_roi_bbox_to_board_coordinates() -> None:
+    config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
+    board_bbox = BoardTracker(config).roi_bbox_to_board((10, 20, 100, 200))
+
+    assert board_bbox == (564, 598, 200, 400)
+
+
 def test_tracker_warps_roi_once(monkeypatch) -> None:
     config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
     tracker = BoardTracker(config)

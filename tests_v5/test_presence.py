@@ -60,6 +60,17 @@ def test_motion_is_reported_between_frames() -> None:
     assert metrics.motion > 1.0
 
 
+def test_motion_ignores_high_frequency_sensor_noise() -> None:
+    analyzer = PresenceAnalyzer()
+    previous = np.full((120, 120), 30, dtype=np.uint8)
+    checker = np.indices(previous.shape).sum(axis=0) % 2
+    current = np.where(checker == 0, 28, 32).astype(np.uint8)
+
+    measured = analyzer.measure(current, previous)
+
+    assert measured.motion < 1.0
+
+
 def test_blur_reduces_local_focus_without_using_marker_focus() -> None:
     source = complete_roi()
     blurred = cv2.GaussianBlur(source, (21, 21), 0)

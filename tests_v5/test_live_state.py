@@ -51,3 +51,14 @@ def test_replacement_before_empty_confirmation_does_not_start_duplicate_cycle() 
 
     assert not event.cycle_released
     assert controller.state is LiveState.RESULT
+
+
+def test_isolated_motion_spike_does_not_reset_stability() -> None:
+    controller = LiveController(LiveConfig(stability_seconds=0.35))
+    feed(controller, occupied=0.50, motion=0.0, at=0.00)
+    feed(controller, occupied=0.50, motion=0.0, at=0.10)
+    feed(controller, occupied=0.50, motion=3.0, at=0.20)
+    feed(controller, occupied=0.50, motion=0.0, at=0.30)
+    event = feed(controller, occupied=0.50, motion=0.0, at=0.50)
+
+    assert event.start_inspection

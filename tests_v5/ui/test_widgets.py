@@ -4,11 +4,13 @@ from pathlib import Path
 
 import numpy as np
 
-from inspection_v5.contracts import TrackingMode
+from inspection_v5.contracts import PublicState, TrackingMode
 from inspection_v5.runtime import InspectionRuntime
 from inspection_v5.ui.component_map import ComponentMap
 from inspection_v5.ui.main_window import MainWindow
+from inspection_v5.ui.result_panel import ResultPanel
 from inspection_v5.ui.video_view import TrackingVideoView
+from inspection_v5.ui.view_model import PresentationViewModel
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -59,3 +61,16 @@ def test_main_window_f11_toggles_fullscreen(qtbot) -> None:
     window.toggle_fullscreen()
     qtbot.wait(20)
     assert not window.isFullScreen()
+
+
+def test_stabilizing_headline_fits_result_panel(qtbot) -> None:
+    panel = ResultPanel()
+    qtbot.addWidget(panel)
+    panel.resize(420, 700)
+    panel.apply(PresentationViewModel.from_public_state(PublicState(tracking_mode=TrackingMode.STABILIZING)))
+    panel.show()
+    qtbot.wait(20)
+
+    assert panel.headline.text() == "ESTABILIZANDO"
+    assert not panel.headline.wordWrap()
+    assert panel.headline.sizeHint().width() <= panel.headline.width()

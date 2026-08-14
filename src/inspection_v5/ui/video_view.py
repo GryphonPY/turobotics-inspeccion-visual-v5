@@ -73,5 +73,7 @@ class TrackingVideoView(QWidget):
                 painter.drawLine(px, py, px + sxn * corner, py)
                 painter.drawLine(px, py, px, py + syn * corner)
             painter.setPen(QPen(color, 1.5))
-            painter.drawText(QRectF(rect.left(), rect.top() - 30, 260, 26), self._label)
+            label_top = max(6.0, rect.top() - 30.0)
+            label_width = max(40.0, min(360.0, target.right() - rect.left() - 6.0))
+            painter.drawText(QRectF(rect.left(), label_top, label_width, 26), self._label)
         painter.end()

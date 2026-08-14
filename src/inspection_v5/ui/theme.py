@@ -37,7 +37,7 @@ def stylesheet() -> str:
     QLabel#brand {{ color: {TEXT}; font-size: 29px; font-weight: 850; letter-spacing: 1px; }}
     QLabel#headerDivider {{ color: {GRAY}; font-size: 29px; font-weight: 400; }}
     QLabel#title {{ color: {TEXT}; font-size: 29px; font-weight: 750; letter-spacing: 1px; }}
-    QLabel#headline {{ color: {TEXT}; font-size: 49px; font-weight: 850; }}
+    QLabel#headline {{ color: {TEXT}; font-size: 42px; font-weight: 850; }}
     QLabel#detail {{ color: {MUTED}; font-size: 22px; }}
     QLabel#instruction {{ color: {CYAN}; font-size: 19px; font-weight: 700; }}
     QFrame#stats {{ background: transparent; }}

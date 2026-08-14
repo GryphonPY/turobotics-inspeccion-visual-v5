@@ -22,6 +22,7 @@ class V5BoardConfig:
     detection_width_px: int
     max_reprojection_error_px: float
     homography_cache_ms: float
+    homography_hold_px: float
 
     @classmethod
     def from_json(cls, path: Path) -> V5BoardConfig:
@@ -36,6 +37,7 @@ class V5BoardConfig:
             detection_width_px=int(raw["detection_width_px"]),
             max_reprojection_error_px=float(raw["max_reprojection_error_px"]),
             homography_cache_ms=float(raw["homography_cache_ms"]),
+            homography_hold_px=float(raw.get("homography_hold_px", 2.0)),
         )
 
 
@@ -107,19 +109,37 @@ class BoardTracker:
             return None, float("inf")
         return homography, self._reprojection_error(source, destination, homography)
 
-    def _roi_homography(self, board_homography: np.ndarray) -> np.ndarray:
+    def _homography_shift(self, candidate: np.ndarray, frame_shape: tuple[int, ...]) -> float:
+        if self._last_homography is None:
+            return float("inf")
+        height, width = frame_shape[:2]
+        corners = np.float32([[[0.0, 0.0], [width - 1.0, 0.0], [width - 1.0, height - 1.0], [0.0, height - 1.0]]])
+        previous_points = cv2.perspectiveTransform(corners, self._last_homography)[0]
+        candidate_points = cv2.perspectiveTransform(corners, candidate)[0]
+        return float(np.mean(np.linalg.norm(candidate_points - previous_points, axis=1)))
+
+    def _roi_from_board(self, board: np.ndarray) -> np.ndarray:
         scale = self.config.pixels_per_mm
         roi = self.config.roi_mm
-        translate = np.array(
-            [[1.0, 0.0, -roi["x"] * scale], [0.0, 1.0, -roi["y"] * scale], [0.0, 0.0, 1.0]],
-            dtype=np.float64,
+        x = round(roi["x"] * scale)
+        y = round(roi["y"] * scale)
+        width = round(roi["width"] * scale)
+        height = round(roi["height"] * scale)
+        crop = board[y : y + height, x : x + width]
+        return cv2.resize(crop, self.config.roi_output_px, interpolation=cv2.INTER_AREA)
+
+    def roi_bbox_to_board(self, bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        x, y, width, height = bbox
+        scale_x = self.config.roi_mm["width"] * self.config.pixels_per_mm / self.config.roi_output_px[0]
+        scale_y = self.config.roi_mm["height"] * self.config.pixels_per_mm / self.config.roi_output_px[1]
+        origin_x = self.config.roi_mm["x"] * self.config.pixels_per_mm
+        origin_y = self.config.roi_mm["y"] * self.config.pixels_per_mm
+        return (
+            round(origin_x + x * scale_x),
+            round(origin_y + y * scale_y),
+            round(width * scale_x),
+            round(height * scale_y),
         )
-        output_scale = self.config.roi_output_px[0] / (roi["width"] * scale)
-        resize = np.array(
-            [[output_scale, 0.0, 0.0], [0.0, output_scale, 0.0], [0.0, 0.0, 1.0]],
-            dtype=np.float64,
-        )
-        return resize @ translate @ board_homography
 
     def observe(self, packet: FramePacket, now: float | None = None) -> TrackingSnapshot:
         now = time.monotonic() if now is None else now
@@ -134,13 +154,18 @@ class BoardTracker:
         reason = ""
         fresh = all(marker_id in found for marker_id in self.REQUIRED_IDS)
         if fresh:
-            homography, error = self._fresh_homography(found)
-            if homography is not None and error <= self.config.max_reprojection_error_px:
-                self._last_homography = homography
+            candidate, error = self._fresh_homography(found)
+            if candidate is not None and error <= self.config.max_reprojection_error_px:
+                if (
+                    self._last_homography is None
+                    or self._homography_shift(candidate, frame.shape) > self.config.homography_hold_px
+                ):
+                    self._last_homography = candidate
                 self._last_observed_at = now
                 self._last_error = error
+                homography = self._last_homography
             else:
-                reason = "reprojection_error" if homography is not None else "homography_failed"
+                reason = "reprojection_error" if candidate is not None else "homography_failed"
         elif self._last_homography is not None and self._last_observed_at is not None:
             age_ms = (now - self._last_observed_at) * 1000.0
             if age_ms <= self.config.homography_cache_ms:
@@ -155,15 +180,8 @@ class BoardTracker:
                 reason=reason or f"missing_markers:{missing}",
             )
 
-        roi_homography = self._roi_homography(homography)
-        roi = cv2.warpPerspective(
-            frame,
-            roi_homography,
-            self.config.roi_output_px,
-            flags=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=(0, 0, 0),
-        )
+        board = cv2.warpPerspective(frame, homography, self.config.canonical_size_px)
+        roi = self._roi_from_board(board)
         age_ms = 0.0 if fresh else (now - (self._last_observed_at or now)) * 1000.0
         return TrackingSnapshot(
             packet.sequence,
@@ -178,4 +196,5 @@ class BoardTracker:
             found_ids=found_ids,
             reprojection_error_px=error,
             reason=reason,
+            board=board,
         )

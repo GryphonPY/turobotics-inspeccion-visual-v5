@@ -52,6 +52,22 @@ def test_runtime_shows_full_camera_frame_when_board_is_not_detected() -> None:
     assert np.array_equal(displayed, full_frame)
 
 
+def test_runtime_prefers_full_board_for_public_display() -> None:
+    runtime = InspectionRuntime(ROOT)
+    board = np.full((2235, 1728, 3), 18, dtype=np.uint8)
+    roi = np.full((560, 320, 3), 220, dtype=np.uint8)
+    runtime._publish_public(
+        TrackingSnapshot(1, 1.0, True, roi, (0, 0, 0, 0), 0.0, 0.0, 0.0, board=board),
+        np.zeros((1080, 1920, 3), dtype=np.uint8),
+    )
+
+    displayed = runtime.latest_public_state().frame
+
+    assert displayed is not None
+    assert displayed.shape[:2] == (2235, 1728)
+    assert int(displayed[0, 0, 0]) == 18
+
+
 def test_slow_inspector_has_one_pending_request() -> None:
     calls: list[int] = []
     calls_lock = Lock()

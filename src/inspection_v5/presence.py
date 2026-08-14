@@ -138,8 +138,10 @@ class PresenceAnalyzer:
             if previous_gray.shape != gray.shape:
                 motion = 0.0
             else:
+                motion_gray = cv2.GaussianBlur(gray, (3, 3), 0)
+                previous_motion_gray = cv2.GaussianBlur(previous_gray, (3, 3), 0)
                 margin = max(1, min(self.config.margin_px, min(gray.shape[:2]) // 4))
-                difference = cv2.absdiff(gray, previous_gray)[margin:-margin, margin:-margin]
+                difference = cv2.absdiff(motion_gray, previous_motion_gray)[margin:-margin, margin:-margin]
                 motion = float(np.mean(difference))
         return PresenceMetrics(
             occupied_ratio,

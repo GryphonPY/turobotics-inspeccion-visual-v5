@@ -287,12 +287,19 @@ class InspectionRuntime:
             detail = "Retira la pieza para continuar"
             instruction = "ESPERANDO ÁREA LIBRE"
         self._public_version += 1
-        display_frame = tracked.roi if tracked.roi is not None else full_frame
+        display_frame = tracked.board if tracked.board is not None else full_frame
+        if display_frame is None:
+            display_frame = tracked.roi
+        display_bbox = (
+            self.tracker.roi_bbox_to_board(tracked.bbox)
+            if tracked.board is not None
+            else tracked.bbox
+        )
         self.public.publish(
             PublicState(
                 version=self._public_version,
                 frame=display_frame,
-                tracking_bbox=tracked.bbox,
+                tracking_bbox=display_bbox,
                 tracking_mode=mode,
                 headline=headline,
                 detail=detail,

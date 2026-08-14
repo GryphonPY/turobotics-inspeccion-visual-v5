@@ -52,6 +52,7 @@ class TrackingSnapshot:
     found_ids: tuple[int, ...] = ()
     reprojection_error_px: float = float("inf")
     reason: str = ""
+    board: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
