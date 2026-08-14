@@ -22,6 +22,9 @@ class FakeRuntime:
     def stop(self) -> None:
         return None
 
+    def reset_counters(self) -> None:
+        return None
+
 
 def state_for(name: str) -> PublicState:
     frame = np.full((560, 320), 24, dtype=np.uint8)

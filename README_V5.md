@@ -10,7 +10,7 @@ V5 es la aplicación nueva y paralela. V4 queda intacta como respaldo.
 4. Coloca el ensamble dentro del rectángulo negro. La app espera estabilidad, analiza sola y muestra `10/10 PRESENTES`, `NO PASA` o `CAPTURA NO CONFIABLE`.
 5. Retira la pieza; después de que el área quede libre puedes colocar la siguiente. No hay que pulsar Espacio.
 
-`CAMBIAR_CAMARA_V5.bat` vuelve a abrir el selector. `ESC` o el botón `Salir` cierran la cámara y los trabajadores. `F2` muestra diagnóstico técnico.
+`CAMBIAR_CAMARA_V5.bat` vuelve a abrir el selector. `ESC` o el botón `Salir` cierran la cámara y los trabajadores. `F2` muestra diagnóstico técnico. Si el selector abre pero la demo no aparece, revisa `logs/v5_launcher.log`; el launcher ya registra la excepción de arranque.
 
 ## Material para la presentación
 

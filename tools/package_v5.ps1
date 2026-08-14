@@ -36,7 +36,7 @@ try {
     if (-not (Test-Path -LiteralPath $snapshot)) { throw "Falta snapshot V4" }
     if (-not (Test-Path -LiteralPath $wheelhouse)) { throw "Falta wheelhouse offline: $wheelhouse" }
 } catch {
-    Write-Error $_
+    [Console]::Error.WriteLine($_.Exception.Message)
     exit 2
 }
 
@@ -55,6 +55,7 @@ $include = @(
     "data\v5\models",
     "data\v5\references",
     "data\v5\manifests",
+    "assets\Logo_TuRobotics_Colorizado.png",
     "docs\OPERACION_DEMO_V5.md",
     "docs\V5_BATERIA_FISICA.md",
     "docs\V5_RELEASE.md",

@@ -11,7 +11,8 @@
 ## Recuperación
 
 - Android no aparece: ejecuta `CAMBIAR_CAMARA_V5.bat`, selecciona el índice en la vista previa y
-  acepta.
+  acepta. Si el selector cierra y no aparece la demo, revisa `logs/v5_launcher.log` y vuelve a
+  abrir `ABRIR_DEMO_V5.vbs`.
 - Cámara desconectada: reconecta el teléfono, vuelve a abrir el selector y reinicia la demo.
 - Tablero no disponible: endereza la hoja y verifica los cuatro ArUco.
 - Resultado no confiable: no muevas la pieza, espera estabilidad y repite.

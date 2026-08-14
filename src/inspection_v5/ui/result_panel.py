@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from .component_map import ComponentMap
-from .theme import CYAN
+from .theme import AMBER, CYAN, GREEN, RED
 from .view_model import PresentationViewModel
 
 
@@ -12,8 +13,8 @@ class ResultPanel(QFrame):
         super().__init__(parent)
         self.setObjectName("panel")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 26, 30, 24)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 18, 24, 18)
+        layout.setSpacing(8)
         eyebrow = QLabel("VERIFICACIÓN DEL ENSAMBLE")
         eyebrow.setObjectName("eyebrow")
         self.headline = QLabel("ÁREA LIBRE")
@@ -25,9 +26,28 @@ class ResultPanel(QFrame):
         self.instruction = QLabel("LISTO PARA INSPECCIONAR")
         self.instruction.setObjectName("instruction")
         self.map = ComponentMap()
-        self.counter = QLabel("APROBADAS 0   ·   DEFECTUOSAS 0   ·   INCIDENCIAS 0")
-        self.counter.setObjectName("counter")
-        self.counter.setWordWrap(True)
+        self.map.setFixedHeight(215)
+        self.counter = QFrame()
+        self.counter.setObjectName("stats")
+        stats_layout = QHBoxLayout(self.counter)
+        stats_layout.setContentsMargins(0, 0, 0, 0)
+        stats_layout.setSpacing(6)
+        self._stat_values: dict[str, QLabel] = {}
+        for key, label, color in (("passed", "APROBADAS", GREEN), ("failed", "NO PASA", RED), ("unreliable", "INCIDENCIAS", AMBER)):
+            card = QFrame()
+            card.setObjectName("statCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(8, 4, 8, 4)
+            card_layout.setSpacing(0)
+            value = QLabel("0")
+            value.setObjectName("statValue")
+            value.setStyleSheet(f"color: {color};")
+            caption = QLabel(label)
+            caption.setObjectName("statLabel")
+            card_layout.addWidget(value, 0, Qt.AlignmentFlag.AlignCenter)
+            card_layout.addWidget(caption, 0, Qt.AlignmentFlag.AlignCenter)
+            stats_layout.addWidget(card, 1)
+            self._stat_values[key] = value
         buttons = QHBoxLayout()
         self.reset_button = QPushButton("Reiniciar")
         self.exit_button = QPushButton("Salir")
@@ -37,7 +57,6 @@ class ResultPanel(QFrame):
         layout.addWidget(self.headline)
         layout.addWidget(self.detail)
         layout.addWidget(self.instruction)
-        layout.addSpacing(8)
         layout.addWidget(self.map, 1)
         layout.addWidget(self.counter)
         layout.addLayout(buttons)
@@ -49,9 +68,6 @@ class ResultPanel(QFrame):
         self.instruction.setText(model.instruction)
         self.instruction.setStyleSheet(f"color: {CYAN if not model.show_result else model.accent};")
         counters = model.counters
-        self.counter.setText(
-            f"APROBADAS {counters.get('passed', 0)}   ·   "
-            f"DEFECTUOSAS {counters.get('failed', 0)}   ·   "
-            f"INCIDENCIAS {counters.get('unreliable', 0)}"
-        )
+        for key, value in self._stat_values.items():
+            value.setText(str(counters.get(key, 0)))
         self.map.set_states(model.component_states)

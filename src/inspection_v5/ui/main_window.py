@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QKeyEvent
+from PySide6.QtGui import QCloseEvent, QKeyEvent, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -18,7 +18,7 @@ from ..contracts import PublicState
 from ..runtime import InspectionRuntime
 from .diagnostic_panel import DiagnosticPanel
 from .result_panel import ResultPanel
-from .theme import CYAN, MUTED, install_fonts, stylesheet
+from .theme import MUTED, install_fonts, stylesheet
 from .video_view import TrackingVideoView
 from .view_model import PresentationViewModel
 
@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         self.runtime = runtime
         self.root = root
         install_fonts()
-        self.setWindowTitle("TUROBOTICS · INSPECCIÓN ÓPTICA")
+        self.setWindowTitle("TUROBOTICS · INSPECCIÓN VISUAL")
         self.setMinimumSize(1280, 720)
         self.setStyleSheet(stylesheet())
         root_widget = QWidget()
@@ -65,10 +65,23 @@ class MainWindow(QMainWindow):
         frame = QFrame()
         layout = QHBoxLayout(frame)
         layout.setContentsMargins(14, 4, 14, 4)
-        title = QLabel("TUROBOTICS  /  INSPECCIÓN ÓPTICA")
+        logo = QLabel()
+        logo.setFixedSize(58, 52)
+        logo_path = self.root / "assets" / "Logo_TuRobotics_Colorizado.png"
+        if logo_path.exists():
+            pixmap = QPixmap(str(logo_path))
+            logo.setPixmap(pixmap.scaled(52, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        brand = QLabel("TUROBOTICS")
+        brand.setObjectName("brand")
+        divider = QLabel("/")
+        divider.setObjectName("headerDivider")
+        title = QLabel("INSPECCIÓN VISUAL")
         title.setObjectName("title")
         status = QLabel("V5 · MODO DEMO")
-        status.setStyleSheet(f"color: {CYAN}; font-size: 18px; font-weight: 700;")
+        status.setStyleSheet(f"color: {MUTED}; font-size: 17px; font-weight: 700;")
+        layout.addWidget(logo)
+        layout.addWidget(brand)
+        layout.addWidget(divider)
         layout.addWidget(title)
         layout.addStretch(1)
         layout.addWidget(status)

@@ -12,4 +12,5 @@ def test_public_launchers_use_pythonw_and_the_v5_module() -> None:
     assert "pythonw.exe" in bat
     assert "inspection_v5.qt_app" in bat
     assert "Run" in vbs
-    assert "ABRIR_DEMO_V5.bat" in vbs
+    assert "inspection_v5.qt_app" in vbs
+    assert "--fullscreen" in vbs

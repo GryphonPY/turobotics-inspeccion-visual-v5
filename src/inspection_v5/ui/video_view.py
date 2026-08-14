@@ -48,7 +48,7 @@ class TrackingVideoView(QWidget):
 
     def paintEvent(self, event: object) -> None:
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor("#060B14"))
+        painter.fillRect(self.rect(), QColor("#0A0A0A"))
         if self._pixmap is None:
             painter.setPen(QColor(GRAY))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "ESPERANDO CÁMARA")

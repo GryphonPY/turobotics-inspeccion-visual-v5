@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import traceback
+from datetime import UTC, datetime
 from pathlib import Path
 
 import cv2
@@ -13,6 +15,14 @@ from .camera_picker import choose_camera
 from .inspector import V5Inspector
 from .runtime import InspectionRuntime
 from .ui.main_window import MainWindow
+
+
+def _log_launcher_error(root: Path, stage: str, exc: BaseException) -> None:
+    log_path = root / "logs" / "v5_launcher.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(f"\n[{datetime.now(UTC).isoformat(timespec='seconds')}] {stage}: {exc!r}\n")
+        traceback.print_exc(file=handle)
 
 
 class CameraWorker(QThread):
@@ -73,11 +83,15 @@ def main() -> int:
     parser.add_argument("--fullscreen", action="store_true")
     args = parser.parse_args()
     root = args.root.resolve()
-    app = QApplication.instance() or QApplication(sys.argv)
-    camera = args.camera if args.camera >= 0 else choose_camera(root, app)
-    if camera is None:
-        return 0
-    return run_qt_app(root, camera, args.fullscreen)
+    try:
+        app = QApplication.instance() or QApplication(sys.argv)
+        camera = args.camera if args.camera >= 0 else choose_camera(root, app)
+        if camera is None:
+            return 0
+        return run_qt_app(root, camera, args.fullscreen)
+    except Exception as exc:  # noqa: BLE001  # launcher must persist unexpected startup failures
+        _log_launcher_error(root, "qt_app_failed", exc)
+        return 1
 
 
 if __name__ == "__main__":
