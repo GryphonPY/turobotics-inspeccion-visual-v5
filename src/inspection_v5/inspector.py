@@ -31,12 +31,21 @@ class V5Inspector:
             self.root / "data" / "v5" / "models" / "presence_v1.manifest.json",
         )
         self.judge = HybridJudge(self.root / "config" / "v5" / "decision.json")
-        self.voter = AdaptiveVoter(min_frames=5, max_frames=9, margin=0.08)
+        decision_config = json.loads((self.root / "config" / "v5" / "decision.json").read_text(encoding="utf-8"))
+        self.voter = AdaptiveVoter(
+            min_frames=5,
+            max_frames=9,
+            margin=0.08,
+            component_presence_min=float(decision_config.get("component_presence_min", 0.80)),
+            component_missing_min=float(decision_config.get("component_missing_min", 0.40)),
+        )
 
     def reset(self) -> None:
         self.voter.reset()
 
     def __call__(self, snapshot: TrackingSnapshot) -> CycleVerdict | None:
+        if self.voter.finished:
+            return None
         if snapshot.roi is None or snapshot.roi.size == 0:
             return None
         gray = cv2.cvtColor(snapshot.roi, cv2.COLOR_BGR2GRAY) if snapshot.roi.ndim == 3 else snapshot.roi

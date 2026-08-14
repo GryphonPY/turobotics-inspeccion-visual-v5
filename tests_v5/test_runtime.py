@@ -6,7 +6,9 @@ from threading import Lock
 
 import numpy as np
 
-from inspection_v5.contracts import TrackingSnapshot
+from inspection_v5.contracts import ComponentPublicState, TrackingSnapshot, Verdict
+from inspection_v5.fusion import CycleVerdict
+from inspection_v5.live_state import LiveState
 from inspection_v5.runtime import InspectionRuntime
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -66,6 +68,29 @@ def test_runtime_prefers_full_board_for_public_display() -> None:
     assert displayed is not None
     assert displayed.shape[:2] == (2235, 1728)
     assert int(displayed[0, 0, 0]) == 18
+
+
+def test_runtime_counts_only_the_first_result_of_a_cycle() -> None:
+    runtime = InspectionRuntime(ROOT)
+    runtime.live.state = LiveState.INSPECTING
+    snapshot = TrackingSnapshot(1, 1.0, True, np.zeros((560, 320), dtype=np.uint8), (0, 0, 1, 1), 1.0, 0.0, 100.0)
+    result = CycleVerdict(Verdict.PASS, (ComponentPublicState.PRESENT,) * 10, 5, ())
+
+    runtime._handle_inspection_result(snapshot, result)
+    runtime._handle_inspection_result(snapshot, result)
+
+    assert runtime._counters == {"total": 1, "passed": 1, "failed": 0, "unreliable": 0}
+
+
+def test_runtime_hides_component_claims_for_unreliable_result() -> None:
+    runtime = InspectionRuntime(ROOT)
+    runtime.live.state = LiveState.INSPECTING
+    snapshot = TrackingSnapshot(1, 1.0, True, np.zeros((560, 320), dtype=np.uint8), (0, 0, 1, 1), 1.0, 0.0, 100.0)
+    result = CycleVerdict(Verdict.UNRELIABLE, (ComponentPublicState.PRESENT,) * 10, 9, ("temporal_disagreement",))
+
+    runtime._handle_inspection_result(snapshot, result)
+
+    assert set(runtime._last_components.values()) == {ComponentPublicState.UNKNOWN}
 
 
 def test_slow_inspector_has_one_pending_request() -> None:

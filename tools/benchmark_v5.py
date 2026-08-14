@@ -37,11 +37,13 @@ def benchmark_board(root: Path, frames: int) -> tuple[float, float]:
     tracker = BoardTracker(config)
     frame = synthetic_board(config)
     for sequence in range(5):
-        tracker.observe(FramePacket(sequence, float(sequence), frame), now=float(sequence))
+        capture_time = sequence / 30.0
+        tracker.observe(FramePacket(sequence, capture_time, frame), now=capture_time)
     samples: list[float] = []
     for sequence in range(frames):
+        capture_time = (sequence + 5) / 30.0
         started = time.perf_counter()
-        tracker.observe(FramePacket(sequence, float(sequence), frame), now=float(sequence))
+        tracker.observe(FramePacket(sequence, capture_time, frame), now=capture_time)
         samples.append((time.perf_counter() - started) * 1000.0)
     return statistics.median(samples), float(np.percentile(samples, 95))
 

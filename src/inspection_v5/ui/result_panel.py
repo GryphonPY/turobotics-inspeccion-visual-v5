@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from .component_map import ComponentMap
@@ -21,6 +22,7 @@ class ResultPanel(QFrame):
         self.headline.setObjectName("headline")
         self.headline.setWordWrap(False)
         self.headline.setMinimumHeight(58)
+        self._headline_font = QFont("Segoe UI", 42, QFont.Weight.Black)
         self.detail = QLabel("Coloca la pieza dentro del tablero")
         self.detail.setObjectName("detail")
         self.detail.setWordWrap(True)
@@ -62,9 +64,25 @@ class ResultPanel(QFrame):
         layout.addWidget(self.counter)
         layout.addLayout(buttons)
 
+    def _fit_headline(self) -> None:
+        available = self.headline.width()
+        if available <= 0:
+            return
+        for size in range(42, 19, -1):
+            font = QFont(self._headline_font)
+            font.setPointSize(size)
+            if QFontMetrics(font).horizontalAdvance(self.headline.text()) <= available - 4:
+                self.headline.setFont(font)
+                return
+
+    def resizeEvent(self, event: object) -> None:
+        super().resizeEvent(event)
+        self._fit_headline()
+
     def apply(self, model: PresentationViewModel) -> None:
         self.headline.setText(model.headline)
         self.headline.setStyleSheet(f"color: {model.accent};")
+        self._fit_headline()
         self.detail.setText(model.detail)
         self.instruction.setText(model.instruction)
         self.instruction.setStyleSheet(f"color: {CYAN if not model.show_result else model.accent};")

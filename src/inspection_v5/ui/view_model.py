@@ -23,8 +23,8 @@ class PresentationViewModel:
             headline, detail, accent, show_result = "10/10 PRESENTES", "INSPECCIÓN APROBADA", GREEN, True
         elif state.verdict is Verdict.NO_PASS:
             missing = [name for name, value in state.component_states.items() if value is ComponentPublicState.MISSING]
-            suffix = ", ".join(missing) if missing else "revisa el ensamble"
-            headline, detail, accent, show_result = "NO PASA", f"FALTAN {suffix}", RED, True
+            detail = f"FALTAN {', '.join(missing)}" if missing else "No se confirmaron los 10 componentes"
+            headline, accent, show_result = "NO PASA", RED, True
         elif state.verdict is Verdict.UNRELIABLE:
             headline, detail, accent, show_result = "CAPTURA NO CONFIABLE", "Repite con la pieza quieta", AMBER, True
         elif state.tracking_mode is TrackingMode.STABILIZING:

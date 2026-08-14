@@ -17,6 +17,7 @@ from .contracts import (
     RuntimeMetrics,
     TrackingMode,
     TrackingSnapshot,
+    Verdict,
 )
 from .diagnostics import RotatingJsonlLogger
 from .fusion import CycleVerdict
@@ -71,6 +72,7 @@ class InspectionRuntime:
         self._last_metrics = RuntimeMetrics(log_path=str(self.logger.path))
         self._last_verdict = None
         self._last_components: dict[str, ComponentPublicState] = {}
+        self._last_board: np.ndarray | None = None
         self._counters = {"total": 0, "passed": 0, "failed": 0, "unreliable": 0}
         self._publish_public(
             TrackingSnapshot(0, 0.0, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0, reason="starting")
@@ -154,14 +156,33 @@ class InspectionRuntime:
                 )
 
     def _handle_inspection_result(self, snapshot: TrackingSnapshot, result: CycleVerdict) -> None:
+        if self.live.state not in {LiveState.INSPECTING, LiveState.READY}:
+            self.logger.event(
+                "WARN",
+                "inspection_result_ignored",
+                "Resultado tardío descartado porque el ciclo ya terminó",
+                sequence=snapshot.sequence,
+                verdict=result.verdict.value,
+                state=self.live.state.value,
+            )
+            if self._inspector is not None and hasattr(self._inspector, "reset"):
+                self._inspector.reset()
+            return
         self.live.result_ready()
+        if self._inspector is not None and hasattr(self._inspector, "reset"):
+            self._inspector.reset()
         self._last_verdict = result.verdict
-        self._last_components = {
-            f"C{index:02d}": result.components[index - 1]
-            if index - 1 < len(result.components)
-            else ComponentPublicState.UNKNOWN
-            for index in range(1, 11)
-        }
+        if result.verdict is Verdict.UNRELIABLE:
+            self._last_components = {
+                f"C{index:02d}": ComponentPublicState.UNKNOWN for index in range(1, 11)
+            }
+        else:
+            self._last_components = {
+                f"C{index:02d}": result.components[index - 1]
+                if index - 1 < len(result.components)
+                else ComponentPublicState.UNKNOWN
+                for index in range(1, 11)
+            }
         self._counters["total"] += 1
         if result.verdict.value == "PASS":
             self._counters["passed"] += 1
@@ -188,6 +209,8 @@ class InspectionRuntime:
             started = time.perf_counter()
             try:
                 tracked = self.tracker.observe(packet)
+                if tracked.board is not None:
+                    self._last_board = tracked.board
                 presence = self.presence.measure(tracked.roi, self._previous_roi)
                 self._previous_roi = tracked.roi.copy() if tracked.roi is not None else None
                 tracked = replace(
@@ -250,7 +273,16 @@ class InspectionRuntime:
 
     def _publish_public(self, tracked: TrackingSnapshot, full_frame: np.ndarray | None = None) -> None:
         state = self.live.state
-        if not tracked.board_ok:
+        if state == LiveState.RESULT and self._last_verdict is not None:
+            mode = TrackingMode.LOCKED
+            if self._last_verdict is Verdict.PASS:
+                mode, headline, detail = TrackingMode.PASS, "10/10 PRESENTES", "INSPECCIÓN APROBADA"
+            elif self._last_verdict is Verdict.NO_PASS:
+                mode, headline, detail = TrackingMode.FAIL, "NO PASA", "ENSAMBLE INCOMPLETO O DEFORMADO"
+            else:
+                mode, headline, detail = TrackingMode.FAIL, "CAPTURA NO CONFIABLE", "Repite con la pieza quieta"
+            instruction = "RETIRA LA PIEZA PARA CONTINUAR"
+        elif not tracked.board_ok:
             mode = TrackingMode.EMPTY
             headline = "REVISAR TABLERO"
             detail = "Asegura que los cuatro ArUco estén visibles"
@@ -274,23 +306,18 @@ class InspectionRuntime:
             mode = TrackingMode.DETECTED
             headline = "RETIRANDO"
             detail = "Área vacía en confirmación"
-            instruction = "COLOCA LA SIGUIENTE PIEZA"
-        elif state == LiveState.RESULT and self._last_verdict is not None:
-            mode = TrackingMode.LOCKED
-            if self._last_verdict.value == "PASS":
-                mode, headline, detail = TrackingMode.PASS, "10/10 PRESENTES", "INSPECCIÓN APROBADA"
-            elif self._last_verdict.value == "NO_PASS":
-                mode, headline, detail = TrackingMode.FAIL, "NO PASA", "ENSAMBLE INCOMPLETO O DEFORMADO"
-            else:
-                mode, headline, detail = TrackingMode.FAIL, "CAPTURA NO CONFIABLE", "Repite con la pieza quieta"
-            instruction = "ESPERANDO ÁREA LIBRE"
+            instruction = "RETIRA LA PIEZA"
         else:
             mode = TrackingMode.LOCKED
             headline = "RESULTADO MOSTRADO"
             detail = "Retira la pieza para continuar"
             instruction = "ESPERANDO ÁREA LIBRE"
         self._public_version += 1
-        display_frame = tracked.board if tracked.board is not None else full_frame
+        display_frame = tracked.board
+        if display_frame is None and state == LiveState.RESULT:
+            display_frame = self._last_board
+        if display_frame is None:
+            display_frame = full_frame
         if display_frame is None:
             display_frame = tracked.roi
         display_bbox = (

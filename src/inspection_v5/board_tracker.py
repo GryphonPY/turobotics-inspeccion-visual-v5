@@ -20,9 +20,11 @@ class V5BoardConfig:
     roi_mm: dict[str, float]
     roi_output_px: tuple[int, int]
     detection_width_px: int
+    detection_interval_frames: int
     max_reprojection_error_px: float
     homography_cache_ms: float
     homography_hold_px: float
+    display_change_threshold: float
 
     @classmethod
     def from_json(cls, path: Path) -> V5BoardConfig:
@@ -35,9 +37,11 @@ class V5BoardConfig:
             roi_mm={key: float(value) for key, value in raw["roi_mm"].items()},
             roi_output_px=tuple(raw["roi_output_px"]),
             detection_width_px=int(raw["detection_width_px"]),
+            detection_interval_frames=max(1, int(raw.get("detection_interval_frames", 1))),
             max_reprojection_error_px=float(raw["max_reprojection_error_px"]),
             homography_cache_ms=float(raw["homography_cache_ms"]),
             homography_hold_px=float(raw.get("homography_hold_px", 2.0)),
+            display_change_threshold=float(raw.get("display_change_threshold", 3.0)),
         )
 
 
@@ -61,6 +65,10 @@ class BoardTracker:
         self._last_homography: np.ndarray | None = None
         self._last_observed_at: float | None = None
         self._last_error = float("inf")
+        self._last_found_ids: tuple[int, ...] = ()
+        self._frames_since_detection = 0
+        self._last_board: np.ndarray | None = None
+        self._last_roi: np.ndarray | None = None
 
     def _expected_marker_points(self) -> dict[int, np.ndarray]:
         points: dict[int, np.ndarray] = {}
@@ -162,6 +170,47 @@ class BoardTracker:
         crop = board[y : y + height, x : x + width]
         return cv2.resize(crop, self.config.roi_output_px, interpolation=cv2.INTER_AREA)
 
+    def _roi_from_frame(self, frame: np.ndarray, homography: np.ndarray) -> np.ndarray:
+        scale = self.config.pixels_per_mm
+        roi = self.config.roi_mm
+        x = round(roi["x"] * scale)
+        y = round(roi["y"] * scale)
+        width = round(roi["width"] * scale)
+        height = round(roi["height"] * scale)
+        roi_transform = np.float64(
+            [
+                [1.0, 0.0, -x],
+                [0.0, 1.0, -y],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+        canonical_roi = cv2.warpPerspective(
+            frame,
+            roi_transform @ homography,
+            (width, height),
+            flags=cv2.INTER_LINEAR,
+        )
+        return cv2.resize(
+            canonical_roi,
+            self.config.roi_output_px,
+            interpolation=cv2.INTER_AREA,
+        )
+
+    def _display_board_needs_refresh(self, roi: np.ndarray) -> bool:
+        if self._last_board is None or self._last_roi is None:
+            return True
+        difference = cv2.absdiff(roi, self._last_roi)
+        return float(np.mean(difference)) >= self.config.display_change_threshold
+
+    def _should_refresh_detection(self, now: float) -> bool:
+        if self._last_homography is None or self._last_observed_at is None:
+            return True
+        cache_age_ms = (now - self._last_observed_at) * 1000.0
+        return (
+            cache_age_ms > self.config.homography_cache_ms
+            or self._frames_since_detection >= self.config.detection_interval_frames
+        )
+
     def roi_bbox_to_board(self, bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         x, y, width, height = bbox
         scale_x = self.config.roi_mm["width"] * self.config.pixels_per_mm / self.config.roi_output_px[0]
@@ -181,12 +230,20 @@ class BoardTracker:
         if frame is None or frame.size == 0:
             return TrackingSnapshot(packet.sequence, packet.captured_at, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0, reason="frame_empty")
 
-        found = self._refine_corners(frame, self._detect(frame))
-        found_ids = tuple(sorted(found))
+        refresh_detection = self._should_refresh_detection(now)
+        if refresh_detection:
+            found = self._refine_corners(frame, self._detect(frame))
+            self._frames_since_detection = 0
+            found_ids = tuple(sorted(found))
+        else:
+            found = {}
+            self._frames_since_detection += 1
+            found_ids = self._last_found_ids
         homography: np.ndarray | None = None
         error = float("inf")
-        reason = ""
-        fresh = all(marker_id in found for marker_id in self.REQUIRED_IDS)
+        reason = "cached_homography" if not refresh_detection else ""
+        homography_updated = False
+        fresh = refresh_detection and all(marker_id in found for marker_id in self.REQUIRED_IDS)
         if fresh:
             candidate, error = self._fresh_homography(found)
             if candidate is not None and error <= self.config.max_reprojection_error_px:
@@ -195,8 +252,10 @@ class BoardTracker:
                     or self._homography_shift(candidate, frame.shape) > self.config.homography_hold_px
                 ):
                     self._last_homography = candidate
+                    homography_updated = True
                 self._last_observed_at = now
                 self._last_error = error
+                self._last_found_ids = found_ids
                 homography = self._last_homography
             else:
                 cache_age_ms = (
@@ -216,6 +275,7 @@ class BoardTracker:
                 homography = self._last_homography
                 error = self._last_error
                 reason = "cached_homography"
+                found_ids = self._last_found_ids
         if homography is None:
             missing = ",".join(str(marker_id) for marker_id in self.REQUIRED_IDS if marker_id not in found)
             return TrackingSnapshot(
@@ -224,9 +284,18 @@ class BoardTracker:
                 reason=reason or f"missing_markers:{missing}",
             )
 
-        board = cv2.warpPerspective(frame, homography, self.config.canonical_size_px)
-        roi = self._roi_from_board(board)
+        if homography_updated or self._last_board is None:
+            board = cv2.warpPerspective(frame, homography, self.config.canonical_size_px)
+            roi = self._roi_from_board(board)
+            self._last_board = board
+        else:
+            roi = self._roi_from_frame(frame, homography)
+            board = self._last_board
+            if self._display_board_needs_refresh(roi):
+                board = cv2.warpPerspective(frame, homography, self.config.canonical_size_px)
+                self._last_board = board
         age_ms = 0.0 if fresh else (now - (self._last_observed_at or now)) * 1000.0
+        self._last_roi = roi.copy()
         return TrackingSnapshot(
             packet.sequence,
             packet.captured_at,

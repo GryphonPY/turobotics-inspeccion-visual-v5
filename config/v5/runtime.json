@@ -12,9 +12,11 @@
   "roi_mm": {"x": 67.95, "y": 69.7, "width": 80.0, "height": 140.0},
   "roi_output_px": [320, 560],
   "detection_width_px": 960,
+  "detection_interval_frames": 5,
   "max_reprojection_error_px": 3.0,
   "homography_cache_ms": 300.0,
   "homography_hold_px": 2.0,
+  "display_change_threshold": 3.0,
   "presence": {
     "reference_area_px": 19000.0,
     "margin_px": 20,

@@ -84,24 +84,78 @@ class HybridJudge:
 
 
 class AdaptiveVoter:
-    def __init__(self, *, min_frames: int = 5, max_frames: int = 9, margin: float = 0.08) -> None:
+    def __init__(
+        self,
+        *,
+        min_frames: int = 5,
+        max_frames: int = 9,
+        margin: float = 0.08,
+        component_presence_min: float = 0.80,
+        component_missing_min: float = 0.40,
+    ) -> None:
         self.min_frames = min_frames
         self.max_frames = max_frames
         self.margin = margin
+        self.component_presence_min = component_presence_min
+        self.component_missing_min = component_missing_min
         self.frames: list[FrameVerdict] = []
+        self._finished = False
+
+    @property
+    def finished(self) -> bool:
+        return self._finished
 
     def reset(self) -> None:
         self.frames.clear()
+        self._finished = False
+
+    def _finish(
+        self,
+        verdict: Verdict,
+        components: tuple[ComponentPublicState, ...],
+        reasons: tuple[str, ...],
+    ) -> CycleVerdict:
+        self._finished = True
+        return CycleVerdict(verdict, components, len(self.frames), reasons)
+
+    def _component_vote(self, frames: list[FrameVerdict]) -> tuple[ComponentPublicState, ...]:
+        total = max(1, len(frames))
+        states: list[ComponentPublicState] = []
+        for index in range(10):
+            present = sum(
+                index < len(frame.components)
+                and frame.components[index] is ComponentPublicState.PRESENT
+                for frame in frames
+            )
+            missing = sum(
+                index < len(frame.components)
+                and frame.components[index] is ComponentPublicState.MISSING
+                for frame in frames
+            )
+            if present / total >= self.component_presence_min:
+                states.append(ComponentPublicState.PRESENT)
+            elif missing / total >= self.component_missing_min:
+                states.append(ComponentPublicState.MISSING)
+            else:
+                states.append(ComponentPublicState.UNKNOWN)
+        return tuple(states)
 
     def add(self, frame: FrameVerdict) -> CycleVerdict | None:
+        if self._finished:
+            return None
         self.frames.append(frame)
         if len(self.frames) < self.min_frames:
             return None
         recent = self.frames[-self.min_frames :]
+        component_vote = self._component_vote(recent)
+        if all(state is ComponentPublicState.PRESENT for state in component_vote):
+            return self._finish(Verdict.PASS, component_vote, ())
+        if any(state is ComponentPublicState.MISSING for state in component_vote):
+            return self._finish(Verdict.NO_PASS, component_vote, ("component_missing",))
         if all(item.verdict is Verdict.PASS for item in recent) and all(
             item.global_score >= 0.5 + self.margin for item in recent
         ):
-            return CycleVerdict(Verdict.PASS, recent[-1].components, len(self.frames), ())
+            return self._finish(Verdict.PASS, recent[-1].components, ())
         if all(item.verdict is Verdict.NO_PASS for item in recent):
             components = tuple(
                 ComponentPublicState.MISSING
@@ -109,13 +163,21 @@ class AdaptiveVoter:
                 else ComponentPublicState.UNKNOWN
                 for index in range(10)
             )
-            return CycleVerdict(Verdict.NO_PASS, components, len(self.frames), ("consistent_defect",))
+            return self._finish(Verdict.NO_PASS, components, ("consistent_defect",))
         if len(self.frames) < self.max_frames:
             return None
         pass_count = sum(item.verdict is Verdict.PASS for item in self.frames)
         fail_count = sum(item.verdict is Verdict.NO_PASS for item in self.frames)
         if pass_count == self.max_frames:
-            return CycleVerdict(Verdict.PASS, self.frames[-1].components, len(self.frames), ())
+            return self._finish(Verdict.PASS, self.frames[-1].components, ())
         if fail_count >= self.min_frames and pass_count == 0:
-            return CycleVerdict(Verdict.NO_PASS, self.frames[-1].components, len(self.frames), ("consistent_defect",))
-        return CycleVerdict(Verdict.UNRELIABLE, self.frames[-1].components, len(self.frames), ("temporal_disagreement",))
+            return self._finish(
+                Verdict.NO_PASS,
+                self.frames[-1].components,
+                ("consistent_defect",),
+            )
+        return self._finish(
+            Verdict.UNRELIABLE,
+            self.frames[-1].components,
+            ("temporal_disagreement",),
+        )
