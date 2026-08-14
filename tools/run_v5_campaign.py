@@ -324,6 +324,13 @@ def _scenario_instruction(scenario: str, detail: str | None) -> str:
     return "PREPARA LA ESCENA INDICADA"
 
 
+def rehearsal_schedule() -> list[tuple[str, str | None]]:
+    """Return the visible 30/30 rehearsal with an explicit missing component."""
+    return [("complete", None)] * 30 + [
+        ("single_missing", f"C{(index % 10) + 1:02d}") for index in range(30)
+    ]
+
+
 def _open_camera(camera_index: int) -> cv2.VideoCapture:
     capture = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
     if not capture.isOpened():
@@ -433,14 +440,23 @@ def run_physical_campaign(root: Path, scenario: str, count: int, camera_index: i
 
 
 def run_rehearsal(root: Path, camera_index: int, seconds: float, output: Path | None = None) -> dict[str, object]:
-    schedule = ["complete"] * 30 + ["single_missing"] * 30
+    schedule = rehearsal_schedule()
     capture = _open_camera(camera_index)
     board = BoardTracker(V5BoardConfig.from_json(root / "config" / "v5" / "runtime.json"))
     inspector = V5Inspector(root)
     rows: list[dict[str, object]] = []
     try:
-        for cycle_id, scenario in enumerate(schedule, start=1):
-            row = _capture_physical_cycle(capture, board, inspector, cycle_id, scenario, seconds)
+        for cycle_id, (scenario, detail) in enumerate(schedule, start=1):
+            row = _capture_physical_cycle(
+                capture,
+                board,
+                inspector,
+                cycle_id,
+                scenario,
+                seconds,
+                detail=detail,
+                condition_id=f"REHEARSAL_{cycle_id:03d}",
+            )
             if row is None:
                 break
             rows.append(row)

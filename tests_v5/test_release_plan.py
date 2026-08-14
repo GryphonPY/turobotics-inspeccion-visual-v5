@@ -7,6 +7,7 @@ from tools.run_v5_campaign import (
     _campaign_metrics,
     _load_release_resume_rows,
     _write_release_result,
+    rehearsal_schedule,
     release_schedule,
 )
 
@@ -34,6 +35,15 @@ def test_missing_schedule_identifies_each_component_twenty_times() -> None:
 
     assert set(counts) == {f"C{index:02d}" for index in range(1, 11)}
     assert all(count == 20 for count in counts.values())
+
+
+def test_rehearsal_schedule_names_each_defective_component() -> None:
+    schedule = rehearsal_schedule()
+    assert len(schedule) == 60
+    assert schedule[:30] == [("complete", None)] * 30
+    assert {detail for scenario, detail in schedule[30:] if scenario == "single_missing"} == {
+        f"C{index:02d}" for index in range(1, 11)
+    }
 
 
 def test_unsafe_capture_can_be_rejected_without_being_exactly_unreliable() -> None:
