@@ -38,6 +38,20 @@ def test_runtime_keeps_only_latest_published_frame() -> None:
     assert int(packet.bgr[0, 0, 0]) == 1
 
 
+def test_runtime_shows_full_camera_frame_when_board_is_not_detected() -> None:
+    runtime = InspectionRuntime(ROOT)
+    full_frame = np.full((12, 16, 3), 42, dtype=np.uint8)
+    runtime._publish_public(
+        TrackingSnapshot(1, 1.0, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0, reason="missing_markers:0"),
+        full_frame,
+    )
+
+    displayed = runtime.latest_public_state().frame
+
+    assert displayed is not None
+    assert np.array_equal(displayed, full_frame)
+
+
 def test_slow_inspector_has_one_pending_request() -> None:
     calls: list[int] = []
     calls_lock = Lock()

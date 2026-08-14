@@ -229,7 +229,7 @@ class InspectionRuntime:
                         sequence=packet.sequence,
                     )
                     self._last_state = event.state
-                self._publish_public(tracked)
+                self._publish_public(tracked, packet.bgr)
                 self.logger.event(
                     "INFO",
                     "tracking_frame",
@@ -245,7 +245,7 @@ class InspectionRuntime:
             except Exception as exc:  # noqa: BLE001 - runtime must stay observable
                 self.logger.event("ERROR", "tracking_exception", repr(exc), sequence=packet.sequence)
 
-    def _publish_public(self, tracked: TrackingSnapshot) -> None:
+    def _publish_public(self, tracked: TrackingSnapshot, full_frame: np.ndarray | None = None) -> None:
         state = self.live.state
         if not tracked.board_ok:
             mode = TrackingMode.EMPTY
@@ -287,10 +287,11 @@ class InspectionRuntime:
             detail = "Retira la pieza para continuar"
             instruction = "ESPERANDO ÁREA LIBRE"
         self._public_version += 1
+        display_frame = tracked.roi if tracked.roi is not None else full_frame
         self.public.publish(
             PublicState(
                 version=self._public_version,
-                frame=tracked.roi,
+                frame=display_frame,
                 tracking_bbox=tracked.bbox,
                 tracking_mode=mode,
                 headline=headline,
