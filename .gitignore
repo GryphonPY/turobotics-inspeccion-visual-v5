@@ -1,4 +1,5 @@
 .venv/
+wheelhouse/
 backup/
 __pycache__/
 *.py[cod]
