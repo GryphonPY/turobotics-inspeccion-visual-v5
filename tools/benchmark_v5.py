@@ -8,6 +8,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from inspection_v5.alignment import PoseAligner
 from inspection_v5.board_tracker import BoardTracker, V5BoardConfig
 from inspection_v5.contracts import FramePacket
 from inspection_v5.model_runtime import PresenceModel
@@ -59,19 +60,34 @@ def benchmark_onnx(root: Path, frames: int) -> tuple[float, float]:
     return statistics.median(samples), float(np.percentile(samples, 95))
 
 
+def benchmark_alignment(root: Path, frames: int) -> tuple[float, float]:
+    reference = np.load(root / "data" / "v5" / "references" / "reference_v1.npz")
+    aligner = PoseAligner(reference["mask"], reference["gray"], alignment_min_score=0.35)
+    samples: list[float] = []
+    for _ in range(frames):
+        started = time.perf_counter()
+        aligner.align(reference["mask"], reference["gray"])
+        samples.append((time.perf_counter() - started) * 1000.0)
+    return statistics.median(samples), float(np.percentile(samples, 95))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark V5 stages")
-    parser.add_argument("--stage", choices=("board", "onnx"), required=True)
+    parser.add_argument("--stage", choices=("board", "alignment", "onnx"), required=True)
     parser.add_argument("--frames", type=int, default=200)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
-    median, p95 = (
-        benchmark_board(args.root, args.frames)
-        if args.stage == "board"
-        else benchmark_onnx(args.root, args.frames)
-    )
+    if args.stage == "board":
+        median, p95 = benchmark_board(args.root, args.frames)
+        limit = 35.0
+    elif args.stage == "alignment":
+        median, p95 = benchmark_alignment(args.root, args.frames)
+        limit = 25.0
+    else:
+        median, p95 = benchmark_onnx(args.root, args.frames)
+        limit = 35.0
     print(f"stage={args.stage} frames={args.frames} median_ms={median:.2f} p95_ms={p95:.2f}")
-    return 0 if p95 <= 35.0 else 1
+    return 0 if p95 <= limit else 1
 
 
 if __name__ == "__main__":
