@@ -7,7 +7,16 @@ from inspection_v5.presence import PresenceMetrics
 
 
 def metrics(occupied: float, motion: float = 0.0) -> PresenceMetrics:
-    return PresenceMetrics(occupied, motion, 100.0, (1, 1, 10, 10), np.zeros((20, 20), np.uint8), 42.0, 24.0, 0.0)
+    return PresenceMetrics(
+        occupied,
+        motion,
+        100.0,
+        (1, 1, 10, 10),
+        np.zeros((20, 20), np.uint8),
+        42.0,
+        24.0,
+        0.0,
+    )
 
 
 def feed(controller: LiveController, occupied: float, motion: float, at: float, board_ok: bool = True):
@@ -22,8 +31,7 @@ def test_complete_live_cycle_releases_after_fast_empty() -> None:
     assert event.start_inspection
     controller.result_ready()
     feed(controller, occupied=0.08, motion=2.0, at=0.60)
-    feed(controller, occupied=0.08, motion=0.1, at=0.72)
-    event = feed(controller, occupied=0.08, motion=0.1, at=0.82)
+    event = feed(controller, occupied=0.08, motion=0.1, at=0.72)
     assert event.cycle_released
     assert event.state is LiveState.EMPTY
 
