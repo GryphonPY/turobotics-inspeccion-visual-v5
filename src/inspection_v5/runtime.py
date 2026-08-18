@@ -330,10 +330,10 @@ class InspectionRuntime:
             display_frame = full_frame
         if display_frame is None:
             display_frame = tracked.roi
-        if state in {LiveState.EMPTY, LiveState.REMOVING} or not tracked.board_ok:
-            display_bbox = (0, 0, 0, 0)
-        elif state == LiveState.RESULT and self._last_result_bbox[2] > 0:
+        if state == LiveState.RESULT and self._last_result_bbox[2] > 0:
             display_bbox = self._last_result_bbox
+        elif state in {LiveState.EMPTY, LiveState.REMOVING} or not tracked.board_ok:
+            display_bbox = (0, 0, 0, 0)
         elif tracked.board is not None and tracked.bbox[2] > 0 and tracked.bbox[3] > 0:
             display_bbox = self.tracker.roi_bbox_to_board(tracked.bbox)
         elif tracked.bbox[2] > 0 and tracked.bbox[3] > 0:
@@ -354,7 +354,9 @@ class InspectionRuntime:
                 metrics=self._last_metrics,
                 reasons=self._last_reasons if state == LiveState.RESULT else (),
                 component_states={
-                    f"C{index:02d}": self._last_components.get(f"C{index:02d}", ComponentPublicState.UNKNOWN)
+                    f"C{index:02d}": self._last_components.get(
+                        f"C{index:02d}", ComponentPublicState.UNKNOWN
+                    )
                     if state == LiveState.RESULT
                     else ComponentPublicState.UNKNOWN
                     for index in range(1, 11)
