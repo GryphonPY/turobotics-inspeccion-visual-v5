@@ -49,6 +49,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v5.0.0' }}
           name: TuRobotics Inspección Visual V5 (Portable)
           body: |
             ## 🚀 TuRobotics — Inspección Visual Asistida por Computadora (V5 Portable)
