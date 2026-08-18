@@ -145,9 +145,16 @@ Instala las dependencias de desarrollo:
 python -m pip install -e ".[dev]"
 ```
 
-Ejecuta la suite completa:
+Ejecuta la suite principal:
 
 ```bash
+python -m pytest -v
+```
+
+Los tests de entrenamiento y paridad PyTorch/ONNX son opcionales. Para incluirlos instala también:
+
+```bash
+python -m pip install -e ".[dev,train]"
 python -m pytest -v
 ```
 
@@ -159,7 +166,7 @@ python -m ruff check src tools tests
 
 El repositorio incluye pruebas unitarias, integración, validaciones del pipeline y pruebas de rendimiento dentro de `tests/`.
 
-GitHub Actions ejecuta automáticamente `ruff` y `pytest` en pushes y pull requests hacia `main`.
+GitHub Actions ejecuta automáticamente `ruff` y la suite principal de `pytest` en pushes y pull requests hacia `main`. Los tests que requieren PyTorch se ejecutan cuando el entorno incluye el extra `train`.
 
 ---
 
