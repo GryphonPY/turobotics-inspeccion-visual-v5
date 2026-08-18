@@ -3,7 +3,7 @@
   "fixtures": [
     {
       "id": "complete",
-      "path": "tests_v5/fixtures/complete.png",
+      "path": "tests/fixtures/complete.png",
       "input_kind": "roi",
       "expected_verdict": "PASS",
       "expected_reason_family": "complete",
@@ -11,7 +11,7 @@
     },
     {
       "id": "missing_c01",
-      "path": "tests_v5/fixtures/missing_c01.png",
+      "path": "tests/fixtures/missing_c01.png",
       "input_kind": "roi",
       "expected_verdict": "NO_PASS",
       "expected_reason_family": "missing_component",
@@ -19,7 +19,7 @@
     },
     {
       "id": "missing_c08",
-      "path": "tests_v5/fixtures/missing_c08.png",
+      "path": "tests/fixtures/missing_c08.png",
       "input_kind": "roi",
       "expected_verdict": "NO_PASS",
       "expected_reason_family": "missing_component",
@@ -27,7 +27,7 @@
     },
     {
       "id": "missing_c10",
-      "path": "tests_v5/fixtures/missing_c10.png",
+      "path": "tests/fixtures/missing_c10.png",
       "input_kind": "roi",
       "expected_verdict": "NO_PASS",
       "expected_reason_family": "missing_component",
@@ -35,7 +35,7 @@
     },
     {
       "id": "blurred",
-      "path": "tests_v5/fixtures/blurred.png",
+      "path": "tests/fixtures/blurred.png",
       "input_kind": "roi",
       "expected_verdict": "UNRELIABLE",
       "expected_reason_family": "quality",
@@ -43,7 +43,7 @@
     },
     {
       "id": "bad_light",
-      "path": "tests_v5/fixtures/bad_light.png",
+      "path": "tests/fixtures/bad_light.png",
       "input_kind": "roi",
       "expected_verdict": "UNRELIABLE",
       "expected_reason_family": "quality",
@@ -51,7 +51,7 @@
     },
     {
       "id": "empty",
-      "path": "tests_v5/fixtures/empty.png",
+      "path": "tests/fixtures/empty.png",
       "input_kind": "roi",
       "expected_verdict": "UNRELIABLE",
       "expected_reason_family": "empty",
@@ -59,7 +59,7 @@
     },
     {
       "id": "rearranged",
-      "path": "tests_v5/fixtures/rearranged.png",
+      "path": "tests/fixtures/rearranged.png",
       "input_kind": "roi",
       "expected_verdict": "NO_PASS",
       "expected_reason_family": "geometry",
@@ -67,7 +67,7 @@
     },
     {
       "id": "hand",
-      "path": "tests_v5/fixtures/hand.png",
+      "path": "tests/fixtures/hand.png",
       "input_kind": "roi",
       "expected_verdict": "UNRELIABLE",
       "expected_reason_family": "invasive_object",
@@ -75,7 +75,7 @@
     },
     {
       "id": "board_incomplete",
-      "path": "tests_v5/fixtures/board_incomplete.png",
+      "path": "tests/fixtures/board_incomplete.png",
       "input_kind": "board",
       "expected_verdict": "UNRELIABLE",
       "expected_reason_family": "board",
