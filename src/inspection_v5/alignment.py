@@ -19,17 +19,6 @@ class AlignedCrop:
     reason: str = ""
 
 
-def _principal_angle(mask: np.ndarray) -> float:
-    ys, xs = np.where(mask > 127)
-    if len(xs) < 3:
-        return 0.0
-    points = np.column_stack([xs.astype(np.float32), ys.astype(np.float32)])
-    points -= points.mean(axis=0, keepdims=True)
-    _, _, vt = np.linalg.svd(points, full_matrices=False)
-    vector = vt[0]
-    return float(np.degrees(np.arctan2(vector[1], vector[0])))
-
-
 def _centroid(mask: np.ndarray) -> np.ndarray:
     moments = cv2.moments(mask)
     if moments["m00"] == 0:
@@ -46,15 +35,6 @@ def _warp(image: np.ndarray, matrix: np.ndarray) -> np.ndarray:
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=0,
     )
-
-
-def _iou(first: np.ndarray, second: np.ndarray) -> float:
-    first_bool = first > 127
-    second_bool = second > 127
-    union = np.count_nonzero(first_bool | second_bool)
-    if union == 0:
-        return 0.0
-    return float(np.count_nonzero(first_bool & second_bool) / union)
 
 
 def _square_crop(image: np.ndarray, mask: np.ndarray, size: int) -> np.ndarray:
@@ -110,7 +90,11 @@ class PoseAligner:
         )
         self._scale = 0.50
         self._ref_small = cv2.resize(
-            self.reference_mask, (0, 0), fx=self._scale, fy=self._scale, interpolation=cv2.INTER_AREA
+            self.reference_mask,
+            (0, 0),
+            fx=self._scale,
+            fy=self._scale,
+            interpolation=cv2.INTER_AREA,
         )
         self._padded_ref_s = cv2.copyMakeBorder(
             self._ref_small,
@@ -126,10 +110,26 @@ class PoseAligner:
         input_mask = (mask > 127).astype(np.uint8) * 255
         if cv2.countNonZero(input_mask) == 0:
             empty = np.zeros_like(input_mask)
-            return AlignedCrop(empty, empty, empty, np.eye(2, 3, dtype=np.float32), 0.0, 0.0, 0.0, False, "mask_empty")
+            return AlignedCrop(
+                empty,
+                empty,
+                empty,
+                np.eye(2, 3, dtype=np.float32),
+                0.0,
+                0.0,
+                0.0,
+                False,
+                "mask_empty",
+            )
 
         center = _centroid(input_mask)
-        mask_small = cv2.resize(input_mask, (0, 0), fx=self._scale, fy=self._scale, interpolation=cv2.INTER_AREA)
+        mask_small = cv2.resize(
+            input_mask,
+            (0, 0),
+            fx=self._scale,
+            fy=self._scale,
+            interpolation=cv2.INTER_AREA,
+        )
         center_s = center * self._scale
 
         coarse_candidates: list[tuple[float, float]] = []
@@ -138,13 +138,21 @@ class PoseAligner:
             rad = np.deg2rad(rot)
             cos, sin = np.cos(rad), np.sin(rad)
             cx, cy = center_s
-            base_matrix = np.array([[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32)
+            base_matrix = np.array(
+                [[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32
+            )
             base_matrix[:, 2] = center_s - base_matrix[:, :2] @ np.float32([cx, cy])
-            rotated = cv2.warpAffine(mask_small, base_matrix, self._ref_small.shape[::-1], flags=cv2.INTER_NEAREST)
+            rotated = cv2.warpAffine(
+                mask_small,
+                base_matrix,
+                self._ref_small.shape[::-1],
+                flags=cv2.INTER_NEAREST,
+            )
             ys, xs = np.where(rotated > 127)
             if len(xs) == 0:
                 continue
-            x0, x1, y0, y1 = int(xs.min()), int(xs.max()) + 1, int(ys.min()), int(ys.max()) + 1
+            x0, x1 = int(xs.min()), int(xs.max()) + 1
+            y0, y1 = int(ys.min()), int(ys.max()) + 1
             piece_crop = rotated[y0:y1, x0:x1]
 
             res = cv2.matchTemplate(self._padded_ref_s, piece_crop, cv2.TM_CCORR_NORMED)
@@ -153,28 +161,46 @@ class PoseAligner:
 
         if not coarse_candidates:
             empty = np.zeros_like(input_mask)
-            return AlignedCrop(empty, empty, empty, np.eye(2, 3, dtype=np.float32), 0.0, 0.0, 0.0, False, "alignment_failed")
+            return AlignedCrop(
+                empty,
+                empty,
+                empty,
+                np.eye(2, 3, dtype=np.float32),
+                0.0,
+                0.0,
+                0.0,
+                False,
+                "alignment_failed",
+            )
 
-        coarse_candidates.sort(key=lambda x: x[0], reverse=True)
+        coarse_candidates.sort(key=lambda item: item[0], reverse=True)
         best_rot = coarse_candidates[0][1]
 
-        best = None
+        best: tuple[float, np.ndarray, float] | None = None
         for fine in (-8.0, -6.0, -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0, 6.0, 8.0):
             rot = (best_rot + fine) % 360.0
             rad = np.deg2rad(rot)
             cos, sin = np.cos(rad), np.sin(rad)
             cx, cy = center
-            base_matrix = np.array([[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32)
+            base_matrix = np.array(
+                [[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32
+            )
             base_matrix[:, 2] = center - base_matrix[:, :2] @ np.float32([cx, cy])
-            rotated = cv2.warpAffine(input_mask, base_matrix, (320, 560), flags=cv2.INTER_NEAREST)
+            rotated = cv2.warpAffine(
+                input_mask,
+                base_matrix,
+                input_mask.shape[::-1],
+                flags=cv2.INTER_NEAREST,
+            )
             ys, xs = np.where(rotated > 127)
             if len(xs) == 0:
                 continue
-            x0, x1, y0, y1 = int(xs.min()), int(xs.max()) + 1, int(ys.min()), int(ys.max()) + 1
+            x0, x1 = int(xs.min()), int(xs.max()) + 1
+            y0, y1 = int(ys.min()), int(ys.max()) + 1
             piece_crop = rotated[y0:y1, x0:x1]
 
             res = cv2.matchTemplate(self._padded_ref, piece_crop, cv2.TM_CCORR_NORMED)
-            _, max_val, _, max_loc = cv2.minMaxLoc(res)
+            _, _, _, max_loc = cv2.minMaxLoc(res)
 
             tx = max_loc[0] - self._pad - x0
             ty = max_loc[1] - self._pad - y0
@@ -187,27 +213,44 @@ class PoseAligner:
             cand_area = int(np.count_nonzero(candidate > 127))
             if cand_area == 0:
                 continue
-            inter = int(np.count_nonzero((candidate > 127) & (self.reference_mask > 127)))
-            union = int(np.count_nonzero((candidate > 127) | (self.reference_mask > 127)))
+            inter = int(
+                np.count_nonzero((candidate > 127) & (self.reference_mask > 127))
+            )
+            union = int(
+                np.count_nonzero((candidate > 127) | (self.reference_mask > 127))
+            )
             precision = inter / cand_area
             iou = inter / max(1, union)
             score = precision * 0.70 + iou * 0.30
             if best is None or score > best[0]:
-                best = (score, matrix, rot, iou)
+                best = (score, matrix, rot)
 
         if best is None:
             empty = np.zeros_like(input_mask)
-            return AlignedCrop(empty, empty, empty, np.eye(2, 3, dtype=np.float32), 0.0, 0.0, 0.0, False, "alignment_failed")
+            return AlignedCrop(
+                empty,
+                empty,
+                empty,
+                np.eye(2, 3, dtype=np.float32),
+                0.0,
+                0.0,
+                0.0,
+                False,
+                "alignment_failed",
+            )
 
-        score, matrix, rotation, iou = best
+        score, matrix, rotation = best
         aligned_mask = _warp(input_mask, matrix)
         aligned_gray = _warp(gray, matrix)
         edges = cv2.Canny(aligned_gray, 40, 120)
-        bbox = cv2.boundingRect(aligned_mask)
-        x, y, width, height = bbox
+        x, y, width, height = cv2.boundingRect(aligned_mask)
         crop = aligned_gray[y : y + height, x : x + width]
         local_mask = aligned_mask[y : y + height, x : x + width]
-        laplacian = cv2.Laplacian(crop, cv2.CV_64F)[local_mask > 0] if crop.size else np.array([])
+        laplacian = (
+            cv2.Laplacian(crop, cv2.CV_64F)[local_mask > 0]
+            if crop.size
+            else np.array([])
+        )
         focus = float(np.var(laplacian)) if laplacian.size else 0.0
         valid = score >= self.alignment_min_score
         return AlignedCrop(
