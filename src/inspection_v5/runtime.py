@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
-from threading import Event, RLock, Thread
+from threading import Event, Lock, RLock, Thread
 
 import numpy as np
 
@@ -64,6 +64,7 @@ class InspectionRuntime:
         self._inspector = inspector
         self._stop = Event()
         self._state_lock = RLock()
+        self._inspector_lock = Lock()
         self._thread: Thread | None = None
         self._inspection_thread: Thread | None = None
         self._sequence = 0
@@ -149,10 +150,17 @@ class InspectionRuntime:
     def reset_counters(self) -> None:
         with self._state_lock:
             self._counters = {"total": 0, "passed": 0, "failed": 0, "unreliable": 0}
-            self._publish_public(self.latest_tracking() or TrackingSnapshot(
+            tracked = self.latest_tracking() or TrackingSnapshot(
                 0, 0.0, False, None, (0, 0, 0, 0), 0.0, 0.0, 0.0
-            ))
+            )
+            self._publish_public(tracked)
         self.logger.event("INFO", "counters_reset")
+
+    def _reset_inspector(self) -> None:
+        if self._inspector is None or not hasattr(self._inspector, "reset"):
+            return
+        with self._inspector_lock:
+            self._inspector.reset()
 
     def _inspection_loop(self) -> None:
         last_version = -1
@@ -164,7 +172,8 @@ class InspectionRuntime:
             last_version = version
             started = time.perf_counter()
             try:
-                result = self._inspector(snapshot)
+                with self._inspector_lock:
+                    result = self._inspector(snapshot)
                 if isinstance(result, CycleVerdict):
                     self._handle_inspection_result(snapshot, result)
                 elapsed_ms = (time.perf_counter() - started) * 1000.0
@@ -191,8 +200,7 @@ class InspectionRuntime:
                 ignored = False
                 state = self.live.state.value
                 self.live.result_ready()
-                if self._inspector is not None and hasattr(self._inspector, "reset"):
-                    self._inspector.reset()
+                self.inspection_requests.clear()
                 self._last_verdict = result.verdict
                 self._last_reasons = tuple(result.reasons)
                 self._last_result_bbox = (
@@ -221,6 +229,7 @@ class InspectionRuntime:
                     self._counters["unreliable"] += 1
                 self._publish_public(snapshot)
 
+        self._reset_inspector()
         if ignored:
             self.logger.event(
                 "WARN",
@@ -230,8 +239,6 @@ class InspectionRuntime:
                 verdict=result.verdict.value,
                 state=state,
             )
-            if self._inspector is not None and hasattr(self._inspector, "reset"):
-                self._inspector.reset()
             return
 
         self.logger.event(
@@ -254,8 +261,9 @@ class InspectionRuntime:
             if tracked.board is not None:
                 self._last_board = tracked.board
             event = self.live.update(presence, tracked.board_ok, now)
-            if event.cancel_inspection and hasattr(self._inspector, "reset"):
-                self._inspector.reset()
+            cancel_inspector = bool(event.cancel_inspection)
+            if cancel_inspector:
+                self.inspection_requests.clear()
             if event.cycle_released:
                 self._last_verdict = None
                 self._last_components = {}
@@ -278,6 +286,9 @@ class InspectionRuntime:
             if event.state != self._last_state:
                 self._last_state = event.state
             self._publish_public(tracked, full_frame)
+
+        if cancel_inspector:
+            self._reset_inspector()
         if event.state != previous_state:
             self.logger.event(
                 "INFO",
