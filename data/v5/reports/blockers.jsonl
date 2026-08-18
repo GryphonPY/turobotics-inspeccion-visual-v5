@@ -1,2 +1,0 @@
-{"timestamp":"2026-08-13T00:00:00Z","gate":"fixture_campaign","status":"resolved","evidence":"blurred fixture initially produced PASS","resolution":"added minimum local piece-focus guard and regression test"}
-{"timestamp":"2026-08-13T00:00:00Z","gate":"offline_package","status":"pending_external","evidence":"package_v5.ps1 safely stops because physical_release, rehearsal and wheelhouse gates do not exist yet","resolution":"run physical battery, visible rehearsal and prepare local runtime wheels before packaging"}

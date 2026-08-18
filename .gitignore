@@ -17,13 +17,8 @@ build/
 # Logs and runtime data
 logs/
 *.log
-data/inspection_v4.jsonl
-data/inspection_v4.csv
 
 # Large capture sessions and video holdouts
-data/raw_sessions/*
-data/processed/*
-data/golden_test/*
 data/v5/challenge/*
 !data/v5/challenge/.gitkeep
 
@@ -34,9 +29,6 @@ aligned_mask.png
 head_debug.png
 piece_zoom.png
 
-# Keep models and references intact
-!data/models/*
-!data/references/*
-!data/references_probe/*
+# Keep V5 models and references intact
 !data/v5/models/*
 !data/v5/references/*

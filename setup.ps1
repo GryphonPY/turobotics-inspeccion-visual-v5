@@ -17,4 +17,4 @@ try {
 } finally {
     Pop-Location
 }
-Write-Host "Entorno V4 listo: $venvPython"
+Write-Host "Entorno V5 listo: $venvPython"
