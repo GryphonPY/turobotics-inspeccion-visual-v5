@@ -20,7 +20,7 @@ def test_pipeline_board_benchmark_stays_within_gate() -> None:
 
 def test_permanent_board_fixture_detects_four_markers() -> None:
     config = V5BoardConfig.from_json(ROOT / "config" / "v5" / "runtime.json")
-    image = cv2.imread(str(ROOT / "tests_v5" / "fixtures" / "board_complete.png"))
+    image = cv2.imread(str(ROOT / "tests" / "fixtures" / "board_complete.png"))
     assert image is not None
     observation = BoardTracker(config).observe(FramePacket(1, 1.0, image), now=1.0)
 
