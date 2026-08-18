@@ -30,7 +30,30 @@
     "empty_confirm_seconds": 0.2,
     "empty_confirm_observations": 3
   },
+  "inspection": {
+    "alignment_min_score": 0.35,
+    "presence": {
+      "reference_area_px": 19000.0,
+      "margin_px": 8,
+      "minimum_blob_area_px": 12,
+      "morphology_open_px": 3,
+      "morphology_close_px": 5
+    },
+    "voter": {
+      "min_frames": 5,
+      "max_frames": 9
+    }
+  },
   "quality": {
     "minimum_piece_focus": 14.0
+  },
+  "camera": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "reconnect_after_failures": 8
+  },
+  "logging": {
+    "tracking_interval_seconds": 0.5
   }
 }

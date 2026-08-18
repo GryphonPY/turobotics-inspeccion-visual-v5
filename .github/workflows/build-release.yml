@@ -2,16 +2,22 @@ name: Build and Release Portable Windows App
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+    paths:
+      - 'RELEASE_VERSION'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  test:
     runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
 
     steps:
       - name: Checkout repository
@@ -23,13 +29,58 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pyinstaller
+          python -m pip install -e ".[dev]"
 
-      - name: Build Standalone Executable with PyInstaller
+      - name: Compile sources
+        run: python -m compileall -q src tools
+
+      - name: Windows smoke tests
+        run: >-
+          python -m pytest -v
+          tests/test_board_tracker.py
+          tests/test_presence.py
+          tests/test_inspector.py
+          tests/test_runtime.py
+
+  build:
+    needs: test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: release_meta
+        shell: pwsh
+        run: |
+          $version = (Get-Content "RELEASE_VERSION" -Raw).Trim()
+          if (-not $version) {
+            throw "RELEASE_VERSION está vacío"
+          }
+          $tag = "v$version"
+          if ("${{ github.ref_type }}" -eq "tag" -and "${{ github.ref_name }}" -ne $tag) {
+            throw "El tag ${{ github.ref_name }} no coincide con RELEASE_VERSION ($tag)"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pyinstaller
+
+      - name: Build standalone executable with PyInstaller
         run: |
           pyinstaller --noconfirm --onedir --windowed `
             --name "TuRobotics_Inspeccion_V5" `
@@ -39,30 +90,21 @@ jobs:
             --add-data "assets;assets" `
             src/inspection_v5/qt_app.py
 
-      - name: Package Portable Distribution
+      - name: Package portable distribution
         run: |
           Copy-Item "README.md" -Destination "dist/TuRobotics_Inspeccion_V5/"
+          Copy-Item "docs/RELEASE_NOTES_V5.1.md" -Destination "dist/TuRobotics_Inspeccion_V5/RELEASE_NOTES.md"
           Copy-Item "config/plantilla_inspeccion_carta_v1.pdf" -Destination "dist/TuRobotics_Inspeccion_V5/"
-          Compress-Archive -Path "dist/TuRobotics_Inspeccion_V5" -DestinationPath "TuRobotics_Inspeccion_Visual_V5_Portable_Windows.zip"
+          Compress-Archive -Path "dist/TuRobotics_Inspeccion_V5" -DestinationPath "TuRobotics_Inspeccion_Visual_V5.1_Portable_Windows.zip"
 
-      - name: Create Release and Upload Asset
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+      - name: Create release and upload asset
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v5.0.0' }}
-          name: TuRobotics Inspección Visual V5 (Portable)
-          body: |
-            ## 🚀 TuRobotics — Inspección Visual Asistida por Computadora (V5 Portable)
-            
-            Versión standalone precompilada para Windows 10/11 (64-bit).
-            
-            ### 📦 Instrucciones de Uso Rápido:
-            1. Descarga el archivo **`TuRobotics_Inspeccion_Visual_V5_Portable_Windows.zip`**.
-            2. Descomprime la carpeta en cualquier ubicación.
-            3. Imprime la plantilla `plantilla_inspeccion_carta_v1.pdf` al 100% de escala.
-            4. Conecta tu webcam o celular y ejecuta **`TuRobotics_Inspeccion_V5.exe`**.
-            
-            *No requiere tener Python instalado ni conexión a internet.*
-          files: TuRobotics_Inspeccion_Visual_V5_Portable_Windows.zip
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: TuRobotics Inspección Visual V${{ steps.release_meta.outputs.version }} (Portable)
+          body_path: docs/RELEASE_NOTES_V5.1.md
+          files: TuRobotics_Inspeccion_Visual_V5.1_Portable_Windows.zip
+          fail_on_unmatched_files: true
           draft: false
           prerelease: false

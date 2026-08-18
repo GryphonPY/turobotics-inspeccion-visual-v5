@@ -72,7 +72,14 @@ class MainWindow(QMainWindow):
         logo_path = self.root / "assets" / "Logo_TuRobotics_Colorizado.png"
         if logo_path.exists():
             pixmap = QPixmap(str(logo_path))
-            logo.setPixmap(pixmap.scaled(52, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            logo.setPixmap(
+                pixmap.scaled(
+                    52,
+                    50,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
         brand = QLabel("TUROBOTICS")
         brand.setObjectName("brand")
         divider = QLabel("/")
@@ -95,15 +102,25 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.footer)
         layout.addStretch(1)
         self.camera_status = QLabel("CÁMARA: INICIANDO")
-        self.camera_status.setStyleSheet(f"color: {MUTED}; font-size: 16px; font-weight: 700;")
+        self.camera_status.setStyleSheet(
+            f"color: {MUTED}; font-size: 16px; font-weight: 700;"
+        )
         layout.addWidget(self.camera_status)
         return frame
 
     def set_camera_status(self, message: str) -> None:
         normalized = message.upper()
-        color = RED if "NO SE PUDO" in normalized else GREEN if "CONECTADA" in normalized else MUTED
+        color = (
+            RED
+            if "NO SE PUDO" in normalized
+            else GREEN
+            if "CONECTADA" in normalized or "RECONECTADA" in normalized
+            else MUTED
+        )
         self.camera_status.setText(f"CÁMARA · {message.upper()}")
-        self.camera_status.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: 700;")
+        self.camera_status.setStyleSheet(
+            f"color: {color}; font-size: 16px; font-weight: 700;"
+        )
 
     def toggle_fullscreen(self) -> None:
         if self.isFullScreen():
@@ -113,13 +130,14 @@ class MainWindow(QMainWindow):
 
     def refresh(self) -> None:
         state: PublicState = self.runtime.latest_public_state()
+        if state.version == self._last_state_version:
+            return
         model = PresentationViewModel.from_public_state(state)
         self.video.set_frame(state.frame)
         self.video.set_tracking(state.tracking_bbox, state.tracking_mode, model.headline)
-        if state.version != self._last_state_version:
-            self.panel.apply(model)
-            self.diagnostic.update_metrics(state.metrics)
-            self._last_state_version = state.version
+        self.panel.apply(model)
+        self.diagnostic.update_metrics(state.metrics)
+        self._last_state_version = state.version
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         if event.key() == Qt.Key.Key_F2:
