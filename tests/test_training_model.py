@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-import torch
+import pytest
+
+torch = pytest.importorskip("torch")
+pytest.importorskip("torchvision")
 
 from training_v5.model import V5PresenceNet
 

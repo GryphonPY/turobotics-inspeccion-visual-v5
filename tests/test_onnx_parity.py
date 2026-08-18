@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-import torch
+import pytest
+
+torch = pytest.importorskip("torch")
+pytest.importorskip("onnx")
+pytest.importorskip("torchvision")
 
 from inspection_v5.model_runtime import PresenceModel
 from training_v5.export import export_model
@@ -35,8 +39,6 @@ def test_manifest_mismatch_is_rejected(tmp_path: Path) -> None:
     torch.save(V5PresenceNet(pretrained=False).state_dict(), checkpoint)
     export_model(checkpoint, model_path, manifest)
     model_path.write_bytes(model_path.read_bytes() + b"tampered")
-
-    import pytest
 
     from inspection_v5.model_runtime import ModelIntegrityError
 
