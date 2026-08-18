@@ -18,12 +18,16 @@ def reference() -> tuple[np.ndarray, np.ndarray]:
     return gray, mask
 
 
-def transformed(gray: np.ndarray, mask: np.ndarray, angle: float) -> tuple[np.ndarray, np.ndarray]:
+def transformed(
+    gray: np.ndarray, mask: np.ndarray, angle: float
+) -> tuple[np.ndarray, np.ndarray]:
     center = (gray.shape[1] / 2.0, gray.shape[0] / 2.0)
     matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
     matrix[:, 2] += np.float32([15.0, -12.0])
     return (
-        cv2.warpAffine(gray, matrix, (gray.shape[1], gray.shape[0]), borderValue=24),
+        cv2.warpAffine(
+            gray, matrix, (gray.shape[1], gray.shape[0]), borderValue=24
+        ),
         cv2.warpAffine(mask, matrix, (mask.shape[1], mask.shape[0])),
     )
 
@@ -38,6 +42,21 @@ def test_alignment_accepts_translation_and_arbitrary_in_plane_rotation() -> None
     assert aligned.valid
     assert aligned.pose_score >= 0.45
     assert make_model_tensor(aligned).shape == (3, 224, 224)
+
+
+def test_alignment_preserves_non_legacy_roi_shape() -> None:
+    gray, mask = reference()
+    gray = cv2.resize(gray, (400, 700), interpolation=cv2.INTER_AREA)
+    mask = cv2.resize(mask, (400, 700), interpolation=cv2.INTER_NEAREST)
+    transformed_gray, transformed_mask = transformed(gray, mask, 30.0)
+
+    aligned = PoseAligner(mask, gray, alignment_min_score=0.35).align(
+        transformed_mask, transformed_gray
+    )
+
+    assert aligned.valid
+    assert aligned.gray.shape == gray.shape
+    assert aligned.mask.shape == mask.shape
 
 
 def test_alignment_rejects_empty_mask() -> None:
