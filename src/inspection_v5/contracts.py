@@ -82,3 +82,4 @@ class PublicState:
     component_states: Mapping[str, ComponentPublicState] = field(default_factory=dict)
     counters: Mapping[str, int] = field(default_factory=dict)
     metrics: RuntimeMetrics = field(default_factory=RuntimeMetrics)
+    reasons: tuple[str, ...] = ()

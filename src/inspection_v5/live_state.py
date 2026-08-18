@@ -21,11 +21,11 @@ class LiveState(str, Enum):
 @dataclass(frozen=True)
 class LiveConfig:
     occupied_enter_ratio: float = 0.35
-    empty_exit_ratio: float = 0.12
+    empty_exit_ratio: float = 0.15
     motion_stable_max: float = 1.0
-    stability_seconds: float = 0.35
-    empty_confirm_seconds: float = 0.20
-    empty_confirm_observations: int = 3
+    stability_seconds: float = 0.30
+    empty_confirm_seconds: float = 0.08
+    empty_confirm_observations: int = 2
 
 
 @dataclass(frozen=True)

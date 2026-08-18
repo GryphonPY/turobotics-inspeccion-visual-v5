@@ -57,10 +57,14 @@ class PresenceAnalyzer:
         background_mad = _mad(samples)
         inner = gray[margin:-margin, margin:-margin]
         otsu = float(cv2.threshold(inner, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0])
-        threshold = max(median + 18.0, otsu)
+        mad_offset = max(18.0, 3.5 * background_mad)
+        if otsu < median + 20.0:
+            threshold = median + max(32.0, mad_offset)
+        else:
+            threshold = max(median + mad_offset, min(otsu * 0.75, median + 36.0))
         return threshold, median, background_mad
 
-    def _select_piece(self, mask: np.ndarray) -> np.ndarray:
+    def _select_piece(self, mask: np.ndarray, gray: np.ndarray | None = None) -> np.ndarray:
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = [
             contour
@@ -69,10 +73,23 @@ class PresenceAnalyzer:
         ]
         if not contours:
             return np.zeros_like(mask)
+        if gray is not None:
+            gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
+            gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
+            gmag = np.sqrt(gx * gx + gy * gy)
+            valid = []
+            for contour in contours:
+                c_mask = np.zeros_like(gray)
+                cv2.drawContours(c_mask, [contour], -1, 255, thickness=3)
+                mean_g = float(np.mean(gmag[c_mask > 0])) if np.count_nonzero(c_mask > 0) else 0.0
+                if mean_g >= 18.0:
+                    valid.append(contour)
+            if valid:
+                contours = valid
         contours.sort(key=cv2.contourArea, reverse=True)
         main = contours[0]
         x, y, width, height = cv2.boundingRect(main)
-        expanded = (x - 0.30 * width, y - 0.30 * height, x + 1.30 * width, y + 1.30 * height)
+        expanded = (x - 14, y - 14, x + width + 14, y + height + 14)
         selected = [main]
         for contour in contours[1:]:
             cx, cy, cw, ch = cv2.boundingRect(contour)
@@ -121,11 +138,15 @@ class PresenceAnalyzer:
                 (self.config.morphology_close_px, self.config.morphology_close_px),
             ),
         )
-        selected = self._select_piece(mask)
+        selected = self._select_piece(mask, gray)
+        if np.count_nonzero(selected > 0):
+            mean_intensity = float(np.mean(gray[selected > 0]))
+            if mean_intensity < median + 25.0:
+                selected = np.zeros_like(mask)
         area = int(cv2.countNonZero(selected))
         occupied_ratio = min(1.0, area / max(1.0, self.config.reference_area_px))
         ys, xs = np.where(selected > 0)
-        if not len(xs):
+        if not len(xs) or occupied_ratio < 0.08:
             bbox = (0, 0, 0, 0)
             reason = "piece_not_found"
         else:

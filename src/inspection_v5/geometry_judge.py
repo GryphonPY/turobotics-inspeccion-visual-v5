@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -20,6 +20,7 @@ class GeometryEvidence:
     silhouette_iou: float
     local_scores: Mapping[str, float]
     reasons: tuple[str, ...]
+    reference_support: Mapping[str, float] = field(default_factory=dict)
 
 
 class GeometryJudge:
@@ -27,7 +28,7 @@ class GeometryJudge:
         self,
         reference_mask: np.ndarray,
         anchors_path: Path,
-        global_min_iou: float = 0.85,
+        global_min_iou: float = 0.60,
     ) -> None:
         self.reference_mask = cv2.resize(
             (reference_mask > 127).astype(np.uint8) * 255,
@@ -86,6 +87,10 @@ class GeometryJudge:
         edge_fraction = float(np.count_nonzero(current_edges)) / max(1, current_area)
         global_score = float(0.55 * silhouette_iou + 0.25 * area_score + 0.15 * aspect_score + 0.05 * np.clip(edge_fraction * 10.0, 0.0, 1.0))
         reasons: list[str] = []
+        outside_area = int(np.count_nonzero(current & (~reference)))
+        outside_ratio = outside_area / max(1, current_area)
+        if outside_ratio > 0.15:
+            reasons.append("outside_mass_detected")
         if silhouette_iou < self.global_min_iou:
             reasons.append("silhouette_incompatible")
         if not 0.70 <= area_ratio <= 1.30:
@@ -99,6 +104,13 @@ class GeometryJudge:
             )
             for component_id, anchor_mask in self._anchor_masks.items()
         }
+        reference_support = {
+            component_id: float(
+                np.count_nonzero(current & reference & (anchor_mask > 0))
+                / max(1, np.count_nonzero(reference & (anchor_mask > 0)))
+            )
+            for component_id, anchor_mask in self._anchor_masks.items()
+        }
         return GeometryEvidence(
             not reasons,
             global_score,
@@ -107,4 +119,5 @@ class GeometryJudge:
             silhouette_iou,
             local_scores,
             tuple(reasons),
+            reference_support,
         )

@@ -79,14 +79,11 @@ class MainWindow(QMainWindow):
         divider.setObjectName("headerDivider")
         title = QLabel("INSPECCIÓN VISUAL")
         title.setObjectName("title")
-        status = QLabel("V5 · MODO DEMO")
-        status.setStyleSheet(f"color: {MUTED}; font-size: 17px; font-weight: 700;")
         layout.addWidget(logo)
         layout.addWidget(brand)
         layout.addWidget(divider)
         layout.addWidget(title)
         layout.addStretch(1)
-        layout.addWidget(status)
         return frame
 
     def _footer(self) -> QFrame:

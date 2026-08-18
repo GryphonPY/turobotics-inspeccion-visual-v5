@@ -1,17 +1,42 @@
+# Python environment and caches
 .venv/
+env/
+venv/
+ENV/
 wheelhouse/
 backup/
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
 .pytest_cache/
 .ruff_cache/
+
+# Logs and runtime data
+logs/
+*.log
+data/inspection_v4.jsonl
+data/inspection_v4.csv
+
+# Large capture sessions and video holdouts
 data/raw_sessions/*
 data/processed/*
 data/golden_test/*
-data/inspection_v4.jsonl
-data/inspection_v4.csv
-!data/raw_sessions/.gitkeep
-!data/processed/.gitkeep
-!data/references/.gitkeep
-!data/models/.gitkeep
-!data/golden_test/.gitkeep
+data/v5/challenge/*
+!data/v5/challenge/.gitkeep
+
+# Temporary debug images
+*.png_debug
+aligned_gray.png
+aligned_mask.png
+head_debug.png
+piece_zoom.png
+
+# Keep models and references intact
+!data/models/*
+!data/references/*
+!data/references_probe/*
+!data/v5/models/*
+!data/v5/references/*

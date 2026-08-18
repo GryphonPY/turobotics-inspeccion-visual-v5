@@ -34,8 +34,12 @@ class TrackingVideoView(QWidget):
         self.update()
 
     def set_tracking(self, bbox: tuple[int, int, int, int], mode: TrackingMode, label: str) -> None:
-        self._history.append(bbox)
-        self._bbox = tuple(int(np.median([item[index] for item in self._history])) for index in range(4))
+        if mode == TrackingMode.EMPTY or bbox[2] <= 0 or bbox[3] <= 0:
+            self._history.clear()
+            self._bbox = (0, 0, 0, 0)
+        else:
+            self._history.append(bbox)
+            self._bbox = tuple(int(np.median([item[index] for item in self._history])) for index in range(4))
         self._mode, self._label = mode, label
         self.update()
 
@@ -60,7 +64,7 @@ class TrackingVideoView(QWidget):
         x = (target.width() - scaled.width()) / 2.0
         y = (target.height() - scaled.height()) / 2.0
         painter.drawPixmap(int(x), int(y), scaled)
-        if self._bbox[2] > 0 and self._bbox[3] > 0 and source.width() > 0 and source.height() > 0:
+        if self._mode != TrackingMode.EMPTY and self._bbox[2] > 0 and self._bbox[3] > 0 and source.width() > 0 and source.height() > 0:
             sx, sy = scaled.width() / source.width(), scaled.height() / source.height()
             bx, by, bw, bh = self._bbox
             rect = QRectF(x + bx * sx, y + by * sy, bw * sx, bh * sy)

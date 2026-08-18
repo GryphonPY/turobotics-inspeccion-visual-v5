@@ -69,6 +69,25 @@ def test_complete_components_can_pass_at_rotated_shape_score() -> None:
     assert verdict.verdict is Verdict.PASS
 
 
+def test_reference_support_blocks_false_complete_component_pass() -> None:
+    judge = HybridJudge(ROOT / "config" / "v5" / "decision.json")
+    evidence = GeometryEvidence(
+        usable=False,
+        global_score=0.76,
+        area_ratio=1.04,
+        aspect_score=0.71,
+        silhouette_iou=0.69,
+        local_scores={f"C{i:02d}": 0.80 for i in range(1, 11)},
+        reasons=("silhouette_incompatible", "aspect_incompatible"),
+        reference_support={"C01": 0.58, **{f"C{i:02d}": 0.90 for i in range(2, 11)}},
+    )
+
+    verdict = judge.evaluate(evidence, model((0.99,) * 10, global_value=0.0))
+
+    assert verdict.verdict is Verdict.NO_PASS
+    assert verdict.components[0] is ComponentPublicState.MISSING
+
+
 def test_missing_component_still_blocks_component_only_pass() -> None:
     judge = HybridJudge(ROOT / "config" / "v5" / "decision.json")
     local_scores = {f"C{i:02d}": 0.80 for i in range(1, 11)}
@@ -118,7 +137,7 @@ def test_voter_closes_after_five_unanimous_passes() -> None:
     assert results[-1].verdict is Verdict.PASS
 
 
-def test_voter_passes_complete_components_when_frame_quality_is_uncertain() -> None:
+def test_voter_does_not_pass_when_frame_quality_is_uncertain() -> None:
     voter = AdaptiveVoter(min_frames=5, max_frames=9)
     frame = type(
         "Frame",
@@ -130,11 +149,10 @@ def test_voter_passes_complete_components_when_frame_quality_is_uncertain() -> N
         },
     )()
 
-    results = [voter.add(frame) for _ in range(5)]
+    results = [voter.add(frame) for _ in range(9)]
 
     assert results[-1] is not None
-    assert results[-1].verdict is Verdict.PASS
-    assert results[-1].components == (ComponentPublicState.PRESENT,) * 10
+    assert results[-1].verdict is Verdict.UNRELIABLE
 
 
 def test_voter_waits_for_more_when_one_frame_is_uncertain() -> None:

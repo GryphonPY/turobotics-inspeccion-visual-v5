@@ -48,6 +48,12 @@ class HybridJudge:
         self.component_model_missing_max = float(
             config.get("component_model_missing_max", 0.05)
         )
+        self.component_reference_support_high = _as_float_map(
+            config.get("component_reference_support_high"), names, 0.60
+        )
+        self.component_reference_support_missing_max = _as_float_map(
+            config.get("component_reference_support_missing_max"), names, 0.60
+        )
         self.component_pass_geometry_min = float(
             config.get("component_pass_geometry_min", self.geometry_min)
         )
@@ -57,36 +63,42 @@ class HybridJudge:
             raise ValueError("V5 model must return exactly ten component probabilities")
         scores = tuple(float(value) for value in model.component_probabilities)
         components: list[ComponentPublicState] = []
-        reasons: list[str] = []
+        reasons: list[str] = list(geometry.reasons)
         high_count = 0
         low_count = 0
         for index, name in enumerate(self.names):
             local = float(geometry.local_scores.get(name, 0.0))
             score = scores[index]
-            if score >= max(self.high[name], self.component_model_floor) and local >= self.local_high[name]:
+            reference_support = float(geometry.reference_support.get(name, 1.0))
+            model_present = score >= self.high[name]
+            support_present = reference_support >= self.component_reference_support_high[name]
+            local_present = local >= self.local_high[name]
+            if model_present and support_present and local_present:
                 components.append(ComponentPublicState.PRESENT)
                 high_count += 1
-            elif score <= self.component_model_missing_max and (
-                local <= self.local_low[name]
-                or not geometry.usable
-                or geometry.global_score < self.geometry_min
+            elif (
+                reference_support <= self.component_reference_support_missing_max[name]
+                or local <= self.local_low[name]
+                or score <= self.component_model_missing_max
             ):
                 components.append(ComponentPublicState.MISSING)
                 low_count += 1
-            else:
+            elif not model_present and support_present:
                 components.append(ComponentPublicState.UNKNOWN)
                 reasons.append(f"{name}:judge_disagreement")
-        if not geometry.usable or geometry.global_score < self.geometry_min:
-            reasons.extend(geometry.reasons or ("geometry_incompatible",))
+            elif model_present and not support_present:
+                components.append(ComponentPublicState.UNKNOWN)
+                reasons.append(f"{name}:reference_support_low")
+            else:
+                components.append(ComponentPublicState.MISSING)
+                low_count += 1
         all_components_present = high_count == 10
-        if all_components_present and geometry.global_score >= self.component_pass_geometry_min:
-            return FrameVerdict(Verdict.PASS, tuple(components), scores, model.global_probability, tuple(reasons))
-        if low_count or (model.global_probability <= self.global_low and not all_components_present):
+        if low_count or "outside_mass_detected" in geometry.reasons:
             return FrameVerdict(Verdict.NO_PASS, tuple(components), scores, model.global_probability, tuple(reasons))
-        if model.global_probability >= self.global_high and all_components_present and geometry.usable:
+        if all_components_present and (
+            geometry.global_score >= self.component_pass_geometry_min or geometry.usable
+        ):
             return FrameVerdict(Verdict.PASS, tuple(components), scores, model.global_probability, tuple(reasons))
-        if not geometry.usable or geometry.global_score < self.geometry_min:
-            return FrameVerdict(Verdict.UNRELIABLE, tuple(components), scores, model.global_probability, tuple(reasons))
         return FrameVerdict(Verdict.UNRELIABLE, tuple(components), scores, model.global_probability, tuple(reasons))
 
 
@@ -155,36 +167,39 @@ class AdaptiveVoter:
             return None
         recent = self.frames[-self.min_frames :]
         component_vote = self._component_vote(recent)
-        if all(state is ComponentPublicState.PRESENT for state in component_vote):
+        if all(state is ComponentPublicState.PRESENT for state in component_vote) and all(
+            f.verdict is Verdict.PASS for f in recent
+        ):
             return self._finish(Verdict.PASS, component_vote, ())
         if any(state is ComponentPublicState.MISSING for state in component_vote):
-            return self._finish(Verdict.NO_PASS, component_vote, ("component_missing",))
-        if all(item.verdict is Verdict.PASS for item in recent) and all(
-            item.global_score >= 0.5 + self.margin for item in recent
-        ):
-            return self._finish(Verdict.PASS, recent[-1].components, ())
-        if all(item.verdict is Verdict.NO_PASS for item in recent):
-            components = tuple(
-                ComponentPublicState.MISSING
-                if any(item.components[index] is ComponentPublicState.MISSING for item in recent)
-                else ComponentPublicState.UNKNOWN
-                for index in range(10)
+            reasons = tuple(
+                dict.fromkeys(
+                    reason
+                    for current in recent
+                    for reason in getattr(current, "reasons", ())
+                    if not reason.endswith(":judge_disagreement")
+                )
             )
-            return self._finish(Verdict.NO_PASS, components, ("consistent_defect",))
-        if len(self.frames) < self.max_frames:
-            return None
-        pass_count = sum(item.verdict is Verdict.PASS for item in self.frames)
-        fail_count = sum(item.verdict is Verdict.NO_PASS for item in self.frames)
-        if pass_count == self.max_frames:
-            return self._finish(Verdict.PASS, self.frames[-1].components, ())
-        if fail_count >= self.min_frames and pass_count == 0:
-            return self._finish(
-                Verdict.NO_PASS,
-                self.frames[-1].components,
-                ("consistent_defect",),
-            )
-        return self._finish(
-            Verdict.UNRELIABLE,
-            self.frames[-1].components,
-            ("temporal_disagreement",),
-        )
+            return self._finish(Verdict.NO_PASS, component_vote, reasons)
+        if all(f.verdict is Verdict.NO_PASS for f in recent):
+            reasons = tuple(dict.fromkeys(reason for current in recent for reason in getattr(current, "reasons", ())))
+            return self._finish(Verdict.NO_PASS, component_vote, reasons)
+        if len(self.frames) >= self.max_frames:
+            all_component_vote = self._component_vote(self.frames)
+            if all(state is ComponentPublicState.PRESENT for state in all_component_vote) and all(
+                f.verdict is Verdict.PASS for f in self.frames
+            ):
+                return self._finish(Verdict.PASS, all_component_vote, ())
+            if any(state is ComponentPublicState.MISSING for state in all_component_vote):
+                reasons = tuple(
+                    dict.fromkeys(
+                        reason
+                        for current in self.frames
+                        for reason in getattr(current, "reasons", ())
+                        if not reason.endswith(":judge_disagreement")
+                    )
+                )
+                return self._finish(Verdict.NO_PASS, all_component_vote, reasons)
+            reasons = tuple(dict.fromkeys(reason for current in self.frames for reason in getattr(current, "reasons", ())))
+            return self._finish(Verdict.UNRELIABLE, all_component_vote, reasons)
+        return None

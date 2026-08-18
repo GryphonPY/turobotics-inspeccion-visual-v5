@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "kind": "fixture_campaign",
+  "generated_at": "2026-08-14T20:08:17.137837+00:00",
+  "git_revision": "06ed65148cd3295eb91ab9496b655f9cf226baac",
+  "fixture_count": 10,
+  "evaluated_count": 10,
+  "false_passes": 0,
+  "false_rejects": 0,
+  "release_ready": true,
+  "artifact_hashes": {
+    "complete": "7ceedc6d197aa36b7d217b7fd0a1373d8cfc7f0285ec9983d612bd64c4348629",
+    "missing_c01": "727fe81c316e8daaa81d4d204f093c1fe5efa57828a8c9bce651dafbe494ca73",
+    "missing_c08": "60b2d87a73055656ddc019fcb31a6236610037cab38734689f21fe2cd0cac35a",
+    "missing_c10": "c1253a90bf14664319ee9f8d55a8f7c054cb7d2ef5d9c7fea068257f407f6ac1",
+    "blurred": "fb19609a909f501440a1d15f9cc14bc117a4a5e953ed2df44d594f528e3fdb11",
+    "bad_light": "d5c83f96fd43c2247c97194c3ec748a2145c1e5e2bc5fbe3a387831b4cbdb7a2",
+    "empty": "8cf576e0165569238de6b00a7af2551a0b40ea784ca549e4bc75a00608e0d100",
+    "rearranged": "d1c22b4fbe90cfb60ea3fcc6eca4ea139d7adf86f82e1fc9a403b20fdbb40911",
+    "hand": "7900bee521b7f6ca47be467496764cab59c5e5a04bcd33178814f2e498d68349",
+    "board_incomplete": "7ceedc6d197aa36b7d217b7fd0a1373d8cfc7f0285ec9983d612bd64c4348629"
+  },
+  "rows": [
+    {
+      "fixture_id": "complete",
+      "expected_verdict": "PASS",
+      "expected_reason_family": "complete",
+      "actual_verdict": "PASS",
+      "frames_used": 5,
+      "latency_ms": 240.06519999966258,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": []
+    },
+    {
+      "fixture_id": "missing_c01",
+      "expected_verdict": "NO_PASS",
+      "expected_reason_family": "missing_component",
+      "actual_verdict": "NO_PASS",
+      "frames_used": 5,
+      "latency_ms": 158.15479999946547,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "component_missing"
+      ]
+    },
+    {
+      "fixture_id": "missing_c08",
+      "expected_verdict": "NO_PASS",
+      "expected_reason_family": "missing_component",
+      "actual_verdict": "NO_PASS",
+      "frames_used": 5,
+      "latency_ms": 153.89560000039637,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "component_missing"
+      ]
+    },
+    {
+      "fixture_id": "missing_c10",
+      "expected_verdict": "NO_PASS",
+      "expected_reason_family": "missing_component",
+      "actual_verdict": "NO_PASS",
+      "frames_used": 5,
+      "latency_ms": 149.1195999988122,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "component_missing"
+      ]
+    },
+    {
+      "fixture_id": "blurred",
+      "expected_verdict": "UNRELIABLE",
+      "expected_reason_family": "quality",
+      "actual_verdict": "UNRELIABLE",
+      "frames_used": 9,
+      "latency_ms": 140.34459999675164,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "temporal_disagreement"
+      ]
+    },
+    {
+      "fixture_id": "bad_light",
+      "expected_verdict": "UNRELIABLE",
+      "expected_reason_family": "quality",
+      "actual_verdict": "UNRELIABLE",
+      "frames_used": 9,
+      "latency_ms": 131.9058999979461,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "temporal_disagreement"
+      ]
+    },
+    {
+      "fixture_id": "empty",
+      "expected_verdict": "UNRELIABLE",
+      "expected_reason_family": "empty",
+      "actual_verdict": "UNRELIABLE",
+      "frames_used": 9,
+      "latency_ms": 126.6883999996935,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "temporal_disagreement"
+      ]
+    },
+    {
+      "fixture_id": "rearranged",
+      "expected_verdict": "NO_PASS",
+      "expected_reason_family": "geometry",
+      "actual_verdict": "NO_PASS",
+      "frames_used": 5,
+      "latency_ms": 155.20610000021406,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "component_missing"
+      ]
+    },
+    {
+      "fixture_id": "hand",
+      "expected_verdict": "UNRELIABLE",
+      "expected_reason_family": "invasive_object",
+      "actual_verdict": "NO_PASS",
+      "frames_used": 5,
+      "latency_ms": 170.96220000166795,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "component_missing"
+      ]
+    },
+    {
+      "fixture_id": "board_incomplete",
+      "expected_verdict": "UNRELIABLE",
+      "expected_reason_family": "board",
+      "actual_verdict": "UNRELIABLE",
+      "frames_used": 0,
+      "latency_ms": 22.659899997961475,
+      "false_pass": false,
+      "false_reject": false,
+      "reasons": [
+        "missing_markers:0,1,2,3"
+      ]
+    }
+  ]
+}

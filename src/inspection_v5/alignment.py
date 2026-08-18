@@ -93,40 +93,113 @@ class PoseAligner:
         self,
         reference_mask: np.ndarray,
         reference_gray: np.ndarray,
-        alignment_min_score: float = 0.45,
+        alignment_min_score: float = 0.35,
     ) -> None:
         self.reference_mask = (reference_mask > 127).astype(np.uint8) * 255
         self.reference_gray = reference_gray.copy()
         self.alignment_min_score = alignment_min_score
+        self._pad = 80
+        self._padded_ref = cv2.copyMakeBorder(
+            self.reference_mask,
+            self._pad,
+            self._pad,
+            self._pad,
+            self._pad,
+            cv2.BORDER_CONSTANT,
+            value=0,
+        )
+        self._scale = 0.50
+        self._ref_small = cv2.resize(
+            self.reference_mask, (0, 0), fx=self._scale, fy=self._scale, interpolation=cv2.INTER_AREA
+        )
+        self._padded_ref_s = cv2.copyMakeBorder(
+            self._ref_small,
+            round(self._pad * self._scale),
+            round(self._pad * self._scale),
+            round(self._pad * self._scale),
+            round(self._pad * self._scale),
+            cv2.BORDER_CONSTANT,
+            value=0,
+        )
 
     def align(self, mask: np.ndarray, gray: np.ndarray) -> AlignedCrop:
         input_mask = (mask > 127).astype(np.uint8) * 255
         if cv2.countNonZero(input_mask) == 0:
             empty = np.zeros_like(input_mask)
             return AlignedCrop(empty, empty, empty, np.eye(2, 3, dtype=np.float32), 0.0, 0.0, 0.0, False, "mask_empty")
-        reference_center = _centroid(self.reference_mask)
-        input_center = _centroid(input_mask)
-        reference_angle = _principal_angle(self.reference_mask)
-        input_angle = _principal_angle(input_mask)
-        best: tuple[float, np.ndarray, float] | None = None
-        for flip in (0.0, 180.0):
-            rotation = reference_angle - input_angle + flip
-            radians = np.deg2rad(rotation)
-            cos, sin = np.cos(radians), np.sin(radians)
-            cx, cy = input_center
-            matrix = np.array([[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32)
-            matrix[:, 2] = input_center - matrix[:, :2] @ np.float32([cx, cy])
-            rotated = _warp(input_mask, matrix)
-            translated_center = _centroid(rotated)
-            matrix[:, 2] += reference_center - translated_center
+
+        center = _centroid(input_mask)
+        mask_small = cv2.resize(input_mask, (0, 0), fx=self._scale, fy=self._scale, interpolation=cv2.INTER_AREA)
+        center_s = center * self._scale
+
+        coarse_candidates: list[tuple[float, float]] = []
+        for deg in range(0, 360, 10):
+            rot = float(deg)
+            rad = np.deg2rad(rot)
+            cos, sin = np.cos(rad), np.sin(rad)
+            cx, cy = center_s
+            base_matrix = np.array([[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32)
+            base_matrix[:, 2] = center_s - base_matrix[:, :2] @ np.float32([cx, cy])
+            rotated = cv2.warpAffine(mask_small, base_matrix, self._ref_small.shape[::-1], flags=cv2.INTER_NEAREST)
+            ys, xs = np.where(rotated > 127)
+            if len(xs) == 0:
+                continue
+            x0, x1, y0, y1 = int(xs.min()), int(xs.max()) + 1, int(ys.min()), int(ys.max()) + 1
+            piece_crop = rotated[y0:y1, x0:x1]
+
+            res = cv2.matchTemplate(self._padded_ref_s, piece_crop, cv2.TM_CCORR_NORMED)
+            _, max_val, _, _ = cv2.minMaxLoc(res)
+            coarse_candidates.append((max_val, rot))
+
+        if not coarse_candidates:
+            empty = np.zeros_like(input_mask)
+            return AlignedCrop(empty, empty, empty, np.eye(2, 3, dtype=np.float32), 0.0, 0.0, 0.0, False, "alignment_failed")
+
+        coarse_candidates.sort(key=lambda x: x[0], reverse=True)
+        best_rot = coarse_candidates[0][1]
+
+        best = None
+        for fine in (-8.0, -6.0, -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0, 6.0, 8.0):
+            rot = (best_rot + fine) % 360.0
+            rad = np.deg2rad(rot)
+            cos, sin = np.cos(rad), np.sin(rad)
+            cx, cy = center
+            base_matrix = np.array([[cos, -sin, 0.0], [sin, cos, 0.0]], dtype=np.float32)
+            base_matrix[:, 2] = center - base_matrix[:, :2] @ np.float32([cx, cy])
+            rotated = cv2.warpAffine(input_mask, base_matrix, (320, 560), flags=cv2.INTER_NEAREST)
+            ys, xs = np.where(rotated > 127)
+            if len(xs) == 0:
+                continue
+            x0, x1, y0, y1 = int(xs.min()), int(xs.max()) + 1, int(ys.min()), int(ys.max()) + 1
+            piece_crop = rotated[y0:y1, x0:x1]
+
+            res = cv2.matchTemplate(self._padded_ref, piece_crop, cv2.TM_CCORR_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(res)
+
+            tx = max_loc[0] - self._pad - x0
+            ty = max_loc[1] - self._pad - y0
+
+            matrix = base_matrix.copy()
+            matrix[0, 2] += tx
+            matrix[1, 2] += ty
+
             candidate = _warp(input_mask, matrix)
-            score = _iou(candidate, self.reference_mask)
+            cand_area = int(np.count_nonzero(candidate > 127))
+            if cand_area == 0:
+                continue
+            inter = int(np.count_nonzero((candidate > 127) & (self.reference_mask > 127)))
+            union = int(np.count_nonzero((candidate > 127) | (self.reference_mask > 127)))
+            precision = inter / cand_area
+            iou = inter / max(1, union)
+            score = precision * 0.70 + iou * 0.30
             if best is None or score > best[0]:
-                best = (score, matrix, rotation)
+                best = (score, matrix, rot, iou)
+
         if best is None:
             empty = np.zeros_like(input_mask)
             return AlignedCrop(empty, empty, empty, np.eye(2, 3, dtype=np.float32), 0.0, 0.0, 0.0, False, "alignment_failed")
-        score, matrix, rotation = best
+
+        score, matrix, rotation, iou = best
         aligned_mask = _warp(input_mask, matrix)
         aligned_gray = _warp(gray, matrix)
         edges = cv2.Canny(aligned_gray, 40, 120)

@@ -1,93 +1,137 @@
-# Inspección Visual V4
+# TuRobotics — Sistema de Inspección Visual Asistida por Computadora (V5)
 
-V4 es la versión paralela de la demo de inspección del ensamble LEGO. La V3 original permanece en la carpeta `inspeccion_visual`; no se mezclan sus registros, modelos ni datasets con V4.
+![Estado](https://img.shields.io/badge/Estado-Liberado_V5.0-success?style=for-the-badge)
+![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python&logoColor=white)
+![Plataforma](https://img.shields.io/badge/Plataforma-Windows_x64-informational?style=for-the-badge&logo=windows&logoColor=white)
+![Inferencia](https://img.shields.io/badge/Motor-ONNX_CPU-orange?style=for-the-badge)
 
-## Requisitos físicos
+Sistema industrial autónomo de visión por computadora para el control de calidad e inspección de ensambles mecánicos de 10 componentes. Diseñado para operar en tiempo real sobre hardware estándar (CPU), garantizando alta repetibilidad sin requerir GPU dedicada ni conexión a internet en piso de manufactura.
 
-1. Pega la plantilla `config/plantilla_inspeccion_carta_v1.pdf` sobre una base rígida y plana.
-2. Imprime siempre al 100%, sin “ajustar a página”.
-3. Coloca la cámara del celular desde arriba, de forma que se vean los cuatro marcadores.
-4. Conecta el celular como webcam y cierra aplicaciones que puedan cambiar la exposición.
-5. Coloca el ensamble dentro del rectángulo central de 8 × 14 cm.
+---
 
-## Instalación
+## 📌 Características Principales
 
-En PowerShell:
+- **Rectificación Geométrica Robusta:** Corrección de perspectiva y escalado milimétrico en tiempo real utilizando un patrón perimetral de 4 marcadores ArUco (Diccionario 4x4_50).
+- **Segmentación Invariante:** Procesamiento en escala de grises y gradientes morfológicos, eliminando la dependencia crítica de la temperatura de color o cambios en la iluminación ambiental.
+- **Fusión Híbrida CPU (ONNX + Geometría):** 
+  - Evaluación geométrica de 10 anclas locales contra mapa de referencia espacial.
+  - Modelo de red neuronal optimizado en formato ONNX (`presence_v1.onnx`) para clasificación y desempate en zonas de alta incertidumbre.
+- **Votación Temporal Multi-Fotograma:** Votador por ventana deslizante (5 a 9 cuadros consecutivos estables) que elimina falsos positivos/negativos por vibración o desenfoque transitorio.
+- **Detección de Manipulación y Manos:** Bloqueo preventivo automático durante la colocación y retiro de la pieza (`HOLD / EVALUANDO`).
+- **HMI Industrial en PySide6 / Qt6:**
+  - Interfaz gráfica moderna a pantalla completa.
+  - Selector interactivo de dispositivos de video con vista previa y validación de resolución (mínimo 720p).
+  - Indicadores visuales claros de estado por componente (C01 a C10) y dictamen global (`PASA / NO PASA / CAPTURA NO CONFIABLE`).
+  - Panel de telemetría y diagnóstico en vivo con tecla `F2`.
 
+---
+
+## 📁 Estructura del Repositorio
+
+```text
+├── config/                  # Configuraciones JSON de cámara, umbrales y plantilla PDF oficial
+│   ├── v5/camera.json       # Parámetros y resolución de cámara
+│   ├── v5/decision.json     # Pesos y tolerancias de decisión
+│   └── plantilla_inspeccion_carta_v1.pdf # Tablero de calibración ArUco para imprimir
+├── data/                    # Modelos ONNX y matrices de referencia precompiladas
+│   ├── v5/models/           # Red neuronal ONNX y manifiestos de integridad
+│   ├── v5/references/       # Mapas de referencia geométrica (.npz / .json)
+│   ├── models/              # Clasificadores auxiliares (.joblib)
+│   └── references/          # Descriptores espaciales de componentes
+├── docs/                    # Especificaciones técnicas, manuales de operación y presentación
+│   ├── OPERACION_DEMO_V5.md # Manual de usuario en estación de trabajo
+│   ├── V5_BATERIA_FISICA.md # Protocolo de pruebas físicas y validación
+│   └── Presentacion_Inspeccion_Visual_V5.pdf # Deck técnico de presentación
+├── src/                     # Código fuente modular
+│   ├── inspection_v5/       # Motor V5: Pipeline, alineación, inferencia y GUI Qt6
+│   └── inspection_v4/       # Capa base de procesamiento y utilidades de visión
+├── tests/                   # Pruebas unitarias y de regresión
+├── tests_v5/                # Batería de pruebas automatizadas para el pipeline V5
+├── tools/                   # Herramientas de calibración, benchmarking y packaging
+├── ABRIR_DEMO_V5.bat        # Lanzador principal de la aplicación con consola de logs
+├── ABRIR_DEMO_V5.vbs        # Lanzador silencioso en segundo plano (para piso/demo)
+├── CAMBIAR_CAMARA_V5.bat    # Selector rápido para cambiar dispositivo de video
+├── INSTALAR_V5.bat          # Script de instalación automática en 1 clic
+├── pyproject.toml           # Definición formal del paquete y dependencias
+└── setup.ps1                # Script PowerShell de aprovisionamiento del entorno
+```
+
+---
+
+## 🛠️ Requisitos del Sistema
+
+1. **Hardware:**
+   - Laptop o PC con Windows 10 u 11 (64 bits).
+   - Procesador Intel Core i3 / AMD Ryzen 3 o superior.
+   - 4 GB de memoria RAM disponibles.
+   - Cámara web USB o celular conectado como cámara (ej. DroidCam, Iriun Webcam) con resolución mínima de **1280 × 720 px**.
+2. **Software:**
+   - Python 3.11 o superior instalado (agregado al PATH).
+   - Conexión a internet **únicamente durante la primera instalación** (para descargar librerías).
+
+---
+
+## 🚀 Instalación Rápida (Paso a Paso en Nueva PC)
+
+### 1. Clonar el repositorio
+```bash
+git clone https://github.com/TU_USUARIO/turobotics-inspeccion-visual-v5.git
+cd turobotics-inspeccion-visual-v5
+```
+
+### 2. Ejecutar el instalador automático
+Haz doble clic sobre el archivo **`INSTALAR_V5.bat`** (o ejecuta en PowerShell):
 ```powershell
-Set-Location 'C:\Users\axel2\Desktop\quinto cuatri\proyecto_manufactura-integradora\inspeccion_visual_v4'
 .\setup.ps1
 ```
+Este script:
+- Localiza tu instalación de Python automáticamente.
+- Crea el entorno virtual aislado `.venv`.
+- Actualiza `pip` y descarga todas las dependencias requeridas (`PySide6`, `opencv-contrib-python`, `onnxruntime`, `scikit-learn`, `numpy`, `pillow`).
+- Registra el paquete en modo editable.
 
-El sistema funciona en CPU y no necesita internet después de instalar las dependencias.
+---
 
-## Diagnóstico
+## 🕹️ Operación del Sistema
 
-```powershell
-.\diagnostic.ps1
-```
+### 1. Preparación Física de la Estación
+1. Imprime el archivo `config/plantilla_inspeccion_carta_v1.pdf` en tamaño Carta al **100% de escala** (sin ajustar ni reducir márgenes).
+2. Pega la hoja sobre una superficie plana y rígida.
+3. Posiciona la cámara cenitalmente (desde arriba) de modo que los 4 marcadores ArUco sean completamente visibles en el encuadre.
 
-El diagnóstico enumera cámaras y comprueba los valores de tablero. Si una cámara entrega menos de 1280 × 720, se rechaza para la demo.
+### 2. Ejecutar la Demo
+Haz doble clic en **`ABRIR_DEMO_V5.bat`** (o `ABRIR_DEMO_V5.vbs`):
+1. **Selector de Cámara:** En la ventana inicial, selecciona la cámara conectada y confirma la resolución.
+2. **Inspección Autónoma:**
+   - Coloca el ensamble dentro del rectángulo negro delimitado en la plantilla.
+   - El sistema detectará la estabilidad, evaluará los 10 componentes en tiempo real y emitirá el dictamen en pantalla:
+     - 🟢 **10/10 PRESENTES (PASA):** Ensamble completo y correcto.
+     - 🔴 **NO PASA (FALTANTES):** Muestra con exactitud qué componentes (C01–C10) faltan o están desalineados.
+     - 🟡 **CAPTURA NO CONFIABLE / HOLD:** Si los marcadores están obstruidos, hay exceso de movimiento o desenfoque.
+3. **Ciclo Siguiente:** Retira la pieza. En cuanto el área queda libre, puedes ingresar la siguiente pieza sin necesidad de presionar teclas.
 
-## Captura de referencias
+### 3. Controles y Atajos de Teclado
+- **`ESC` / Botón Salir:** Cierra la aplicación y libera los subprocesos de video.
+- **`F2`:** Activa / desactiva la superposición de telemetría y diagnósticos de visión.
+- **`CAMBIAR_CAMARA_V5.bat`:** Abre directamente el selector para cambiar de webcam.
 
-```powershell
-.\run_capture.ps1
-```
+---
 
-El asistente solicita once estados: `OK` y `C01_MISSING` a `C10_MISSING`. Pulsa ENTER para iniciar cada grabación de 10 segundos. Repite siete rondas cambiando posición y orientación: las rondas 1–6 calibran y la ronda 7 queda reservada como prueba independiente. Los datos se guardan en `data/raw_sessions/<session_id>` como ROI rectificado en gris, muestreado y limitado a 30 fotogramas por estado para mantener el consumo de memoria estable.
+## 🧪 Pruebas Automatizadas y Validación
 
-Cuando exista una sesión completa, puedes construir la referencia explícitamente:
-
-```powershell
-$env:PYTHONPATH = '.\src'
-$python = & .\resolve_python.ps1
-& $python .\tools\validate_session.py session_YYYYMMDD_HHMMSS
-& $python .\tools\build_reference.py session_YYYYMMDD_HHMMSS --training-rounds 1 2 3 4 5 6
-```
-
-La referencia congelada queda en `data/references/reference_set_v1.{json,npz}`.
-
-Después de generarla, evalúa la ronda 7 reservada:
-
-```powershell
-& $python .\tools\evaluate_session.py session_YYYYMMDD_HHMMSS
-```
-
-La evaluación debe terminar con `all_correct: true` antes de usar la demo.
-
-La sesión física es el único insumo que todavía no está incluido en este paquete:
-`data/references/reference_set_v1.{json,npz}` no se crea con imágenes sintéticas ni con
-la V3. Durante la captura, conserva la cabeza amarilla arriba y retira únicamente el
-componente que indique el asistente. La numeración C01–C10 es posicional y debe
-confirmarse físicamente contra el esquema mostrado en pantalla; si una región no se
-separa con evidencia suficiente, la calibración queda bloqueada como `UNRESOLVED`.
-
-## Demo
+Para ejecutar la suite de pruebas unitarias y de integración:
 
 ```powershell
-.\run_demo.ps1
+# Ejecutar pruebas con pytest
+.venv\Scripts\python.exe -m pytest tests tests_v5 -v
+
+# Validación estática de código con ruff
+.venv\Scripts\python.exe -m ruff check src tools tests_v5
 ```
 
-La demo usa varios fotogramas. `PASA` exige que los diez componentes pasen el voto temporal. Si la hoja, la cámara, el enfoque o la pieza no son confiables, muestra `NO PASA` con la causa y no inventa una aprobación.
+---
 
-## Teclas
+## 📄 Licencia y Créditos
 
-- `R`: reiniciar el ciclo actual.
-- `Z`: reiniciar contadores de demostración.
-- `C`: buscar y cambiar a la cámara elegible de mayor resolución.
-- `ESPACIO`: repetir el ciclo sin borrar contadores.
-- `Q` o `ESC`: salir.
-
-## Verificación
-
-```powershell
-$python = '.\.venv\Scripts\python.exe'
-& $python -m compileall -q .\src
-& $python -m pytest -q
-```
-
-Si `python` apunta al alias de Microsoft Store, los scripts usan automáticamente el
-intérprete ejecutable localizado por `resolve_python.ps1`.
-
-La V4 no se libera como demo final hasta probar piezas completas, cada estado faltante, desplazamientos, rotaciones, mala calidad de captura y desconexión de cámara.
+Proyecto desarrollado como parte de la solución de manufactura avanzada e inspección de calidad automatizada para **TuRobotics** (2026).
+Todos los derechos reservados.
