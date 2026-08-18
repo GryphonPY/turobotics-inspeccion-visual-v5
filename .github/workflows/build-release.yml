@@ -1,0 +1,67 @@
+name: Build and Release Portable Windows App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pyinstaller
+
+      - name: Build Standalone Executable with PyInstaller
+        run: |
+          pyinstaller --noconfirm --onedir --windowed `
+            --name "TuRobotics_Inspeccion_V5" `
+            --add-data "config;config" `
+            --add-data "data/v5/models;data/v5/models" `
+            --add-data "data/v5/references;data/v5/references" `
+            --add-data "assets;assets" `
+            src/inspection_v5/qt_app.py
+
+      - name: Package Portable Distribution
+        run: |
+          Copy-Item "README.md" -Destination "dist/TuRobotics_Inspeccion_V5/"
+          Copy-Item "config/plantilla_inspeccion_carta_v1.pdf" -Destination "dist/TuRobotics_Inspeccion_V5/"
+          Compress-Archive -Path "dist/TuRobotics_Inspeccion_V5" -DestinationPath "TuRobotics_Inspeccion_Visual_V5_Portable_Windows.zip"
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          name: TuRobotics Inspección Visual V5 (Portable)
+          body: |
+            ## 🚀 TuRobotics — Inspección Visual Asistida por Computadora (V5 Portable)
+            
+            Versión standalone precompilada para Windows 10/11 (64-bit).
+            
+            ### 📦 Instrucciones de Uso Rápido:
+            1. Descarga el archivo **`TuRobotics_Inspeccion_Visual_V5_Portable_Windows.zip`**.
+            2. Descomprime la carpeta en cualquier ubicación.
+            3. Imprime la plantilla `plantilla_inspeccion_carta_v1.pdf` al 100% de escala.
+            4. Conecta tu webcam o celular y ejecuta **`TuRobotics_Inspeccion_V5.exe`**.
+            
+            *No requiere tener Python instalado ni conexión a internet.*
+          files: TuRobotics_Inspeccion_Visual_V5_Portable_Windows.zip
+          draft: false
+          prerelease: false

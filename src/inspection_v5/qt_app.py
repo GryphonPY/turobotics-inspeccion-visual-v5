@@ -107,8 +107,9 @@ def run_qt_app(root: Path, camera_index: int = 0, fullscreen: bool = False) -> i
 
 
 def main() -> int:
+    default_root = Path(sys._MEIPASS) if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="V5 television demo")
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--root", type=Path, default=default_root)
     parser.add_argument("--camera", type=int, default=-1, help="Índice; -1 abre selector con vista previa")
     parser.add_argument("--fullscreen", action="store_true")
     args = parser.parse_args()
