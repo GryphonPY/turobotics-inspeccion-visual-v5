@@ -18,24 +18,47 @@ from .presence import PresenceAnalyzer, PresenceConfig
 class V5Inspector:
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
-        runtime_config = json.loads((self.root / "config" / "v5" / "runtime.json").read_text(encoding="utf-8"))
-        self.minimum_piece_focus = float(runtime_config.get("quality", {}).get("minimum_piece_focus", 14.0))
+        runtime_path = self.root / "config" / "v5" / "runtime.json"
+        runtime_config = json.loads(runtime_path.read_text(encoding="utf-8"))
+        inspection_config = runtime_config.get("inspection", {})
+        presence_config = inspection_config.get("presence", {})
+        voter_config = inspection_config.get("voter", {})
+        roi_width, roi_height = (int(value) for value in runtime_config["roi_output_px"])
+        self.roi_size = (roi_width, roi_height)
+        self.roi_shape = (roi_height, roi_width)
+        self.minimum_piece_focus = float(
+            runtime_config.get("quality", {}).get("minimum_piece_focus", 14.0)
+        )
+
         reference = np.load(self.root / "data" / "v5" / "references" / "reference_v1.npz")
         self.analyzer = PresenceAnalyzer(
-            PresenceConfig(reference_area_px=19_000.0, margin_px=8, minimum_blob_area_px=12)
+            PresenceConfig(
+                reference_area_px=float(presence_config.get("reference_area_px", 19_000.0)),
+                margin_px=int(presence_config.get("margin_px", 8)),
+                minimum_blob_area_px=int(presence_config.get("minimum_blob_area_px", 12)),
+                morphology_open_px=int(presence_config.get("morphology_open_px", 3)),
+                morphology_close_px=int(presence_config.get("morphology_close_px", 5)),
+            )
         )
-        self.aligner = PoseAligner(reference["mask"], reference["gray"], alignment_min_score=0.35)
-        self.geometry = GeometryJudge(reference["mask"], self.root / "config" / "v5" / "component_anchors.json")
+        self.aligner = PoseAligner(
+            reference["mask"],
+            reference["gray"],
+            alignment_min_score=float(inspection_config.get("alignment_min_score", 0.35)),
+        )
+        self.geometry = GeometryJudge(
+            reference["mask"], self.root / "config" / "v5" / "component_anchors.json"
+        )
         self.model = PresenceModel(
             self.root / "data" / "v5" / "models" / "presence_v1.onnx",
             self.root / "data" / "v5" / "models" / "presence_v1.manifest.json",
         )
         self.judge = HybridJudge(self.root / "config" / "v5" / "decision.json")
-        decision_config = json.loads((self.root / "config" / "v5" / "decision.json").read_text(encoding="utf-8"))
+        decision_config = json.loads(
+            (self.root / "config" / "v5" / "decision.json").read_text(encoding="utf-8")
+        )
         self.voter = AdaptiveVoter(
-            min_frames=5,
-            max_frames=9,
-            margin=0.08,
+            min_frames=int(voter_config.get("min_frames", 5)),
+            max_frames=int(voter_config.get("max_frames", 9)),
             component_presence_min=float(decision_config.get("component_presence_min", 0.80)),
             component_missing_min=float(decision_config.get("component_missing_min", 0.40)),
         )
@@ -48,9 +71,13 @@ class V5Inspector:
             return None
         if snapshot.roi is None or snapshot.roi.size == 0:
             return None
-        gray = cv2.cvtColor(snapshot.roi, cv2.COLOR_BGR2GRAY) if snapshot.roi.ndim == 3 else snapshot.roi
-        if gray.shape != (560, 320):
-            gray = cv2.resize(gray, (320, 560), interpolation=cv2.INTER_AREA)
+        gray = (
+            cv2.cvtColor(snapshot.roi, cv2.COLOR_BGR2GRAY)
+            if snapshot.roi.ndim == 3
+            else snapshot.roi
+        )
+        if gray.shape != self.roi_shape:
+            gray = cv2.resize(gray, self.roi_size, interpolation=cv2.INTER_AREA)
         measured = self.analyzer.measure(gray)
         aligned = self.aligner.align(measured.mask, gray)
         if not aligned.valid:
