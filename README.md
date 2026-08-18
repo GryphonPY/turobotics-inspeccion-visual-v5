@@ -1,6 +1,6 @@
-# TuRobotics — Sistema de Inspección Visual Asistida por Computadora (V5)
+# TuRobotics — Sistema de Inspección Visual Asistida por Computadora (V5.1)
 
-![Estado](https://img.shields.io/badge/Estado-Liberado_V5.0-success?style=for-the-badge)
+![Estado](https://img.shields.io/badge/Estado-V5.1.0-success?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Plataforma](https://img.shields.io/badge/Plataforma-Windows_x64-informational?style=for-the-badge&logo=windows&logoColor=white)
 ![Inferencia](https://img.shields.io/badge/Motor-ONNX_CPU-orange?style=for-the-badge)
@@ -20,6 +20,9 @@ Sistema de visión por computadora para control de calidad e inspección de ensa
 - **Votación temporal multi-fotograma:** estabiliza la decisión ante vibración, movimiento o desenfoque transitorio.
 - **Estados de seguridad de captura:** el sistema puede bloquear la evaluación cuando la captura no es confiable.
 - **HMI en PySide6 / Qt6:** interfaz de operación con selección de cámara, visualización de estados y telemetría.
+- **Reconexión automática de cámara:** recupera webcam o celular después de fallos consecutivos de captura.
+- **Configuración centralizada:** ROI, parámetros de inspección, cámara y telemetría se controlan desde `config/v5/runtime.json`.
+- **Runtime endurecido:** las transiciones compartidas entre tracking e inspección se serializan para evitar carreras entre hilos.
 
 ---
 
@@ -54,12 +57,13 @@ Dictamen global: PASA / NO PASA / CAPTURA NO CONFIABLE
 │   └── v5/
 │       ├── models/          # Modelos ONNX y manifiestos
 │       └── references/      # Referencias geométricas
-├── docs/                    # Manuales, protocolos y documentación técnica
+├── docs/                    # Manuales, protocolos y notas de versión
 ├── src/
 │   ├── inspection_v5/       # Pipeline principal, geometría, inferencia y GUI
 │   └── training_v5/         # Código de entrenamiento y preparación de modelos
 ├── tests/                   # Pruebas unitarias, integración, rendimiento y fixtures
 ├── tools/                   # Utilidades de calibración, benchmarking y empaquetado
+├── RELEASE_VERSION          # Versión utilizada por el workflow de Release
 ├── ABRIR_DEMO_V5.bat        # Lanzador principal de la demo
 ├── ABRIR_DEMO_V5.vbs        # Lanzador silencioso
 ├── CAMBIAR_CAMARA_V5.bat    # Selector rápido de cámara
@@ -137,6 +141,14 @@ El flujo de operación es:
 
 ---
 
+## ⚙️ Configuración V5.1
+
+`config/v5/runtime.json` concentra la geometría del tablero, tamaño del ROI, detección ArUco, presencia para ciclo, presencia para inspección, calidad mínima, cámara y frecuencia de telemetría.
+
+Los valores de decisión por componente permanecen en `config/v5/decision.json`.
+
+---
+
 ## 🧪 Pruebas y calidad de código
 
 Instala las dependencias de desarrollo:
@@ -164,15 +176,17 @@ Ejecuta análisis estático:
 python -m ruff check src tools tests
 ```
 
-El repositorio incluye pruebas unitarias, integración, validaciones del pipeline y pruebas de rendimiento dentro de `tests/`.
+GitHub Actions valida la suite completa en Ubuntu y añade smoke tests nativos en Windows para board tracking, presencia, inspector y runtime.
 
-GitHub Actions ejecuta automáticamente `ruff` y la suite principal de `pytest` en pushes y pull requests hacia `main`. Los tests que requieren PyTorch se ejecutan cuando el entorno incluye el extra `train`.
+El workflow de Release vuelve a ejecutar smoke tests en Windows antes de construir el portable.
 
 ---
 
 ## 📊 Validación
 
 El proyecto incluye documentación y pruebas orientadas a validar el sistema frente a escenarios de piezas completas, componentes faltantes, variaciones de colocación y condiciones de captura. Los resultados de validación física deben reportarse únicamente con mediciones obtenidas durante las pruebas reales del sistema.
+
+V5.1 mejora robustez de software, concurrencia, cámara, entrenamiento y empaquetado, pero no sustituye la batería física de validación ni modifica silenciosamente los umbrales calibrados de PASS / NO PASS.
 
 ---
 
