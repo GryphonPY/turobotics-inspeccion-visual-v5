@@ -52,5 +52,8 @@
     "height": 1080,
     "fps": 30,
     "reconnect_after_failures": 8
+  },
+  "logging": {
+    "tracking_interval_seconds": 0.5
   }
 }
